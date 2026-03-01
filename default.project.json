@@ -1,0 +1,10 @@
+{
+    "name": "videkery",
+    "tree": {
+        "$path": "src",
+        "stories": {
+            "$className": "Folder",
+            "$path": "stories"
+        }
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "name": "ShopUI",
+    "servePort": 35001,
+    "tree": {
+        "$className": "DataModel",
+        "ReplicatedStorage": {
+            "$ignoreUnknownInstances": false,
+            "Source": {
+                "$path": "src"
+            },
+            "Packages": {
+                "$className": "Folder",
+                "BakeryVideKit": {
+                    "$path": "../../src"
+                },
+                "roblox_packages": {
+                    "$path": "../../roblox_packages"
+                }
+            }
+        }
+    }
+}

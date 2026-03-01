@@ -1,0 +1,40 @@
+name = "storybakery/videkery"
+version = "0.0.0"
+description = "A reactive Luau library for creating UI."
+authors = ["centau", "storybakery"]
+repository = "https://github.com/StoryBakery/videkery"
+license = "MIT"
+includes = ["src/*", "README.md", "pesde.toml"]
+
+[target]
+environment = "roblox"
+build_files = ["src"]
+lib = "src/init.luau"
+
+[indices]
+default = "https://github.com/pesde-pkg/index"
+
+[wally_indices]
+default = "https://github.com/UpliftGames/wally-index"
+
+[dependencies]
+LinearInterpolation = { repo = "https://github.com/StoryBakery/LinearInterpolation", rev = "v0.1.0" }
+ui-labs = { wally = "pepeeltoro41/ui-labs", version = "^2.4.2" }
+Maid = { repo = "https://github.com/StoryBakery/Maid", rev = "v0.1.0" }
+TableUtil = { repo = "https://github.com/StoryBakery/TableUtil", rev = "v0.1.0" }
+MathUtil = { repo = "https://github.com/StoryBakery/MathUtil", rev = "v0.1.0" }
+DynamicTimer = { repo = "https://github.com/StoryBakery/DynamicTimer", rev = "v0.1.0" }
+UserInputManager = { repo = "https://github.com/StoryBakery/UserInputManager", rev = "v0.1.0" }
+ExtendedTranslator = { repo = "https://github.com/StoryBakery/ExtendedTranslator", rev = "v0.1.0" }
+
+[scripts]
+roblox_sync_config_generator = ".pesde/scripts/roblox_sync_config_generator.luau"
+sourcemap_generator = ".pesde/scripts/sourcemap_generator.luau"
+
+[dev_dependencies]
+scripts = { name = "pesde/scripts_rojo", version = "^0.2.0", target = "lune" }
+rojo = { name = "pesde/rojo", version = "^7.5.1", target = "lune" }
+
+[engines]
+pesde = "^0.7.0"
+lune = "^0.10.2"
