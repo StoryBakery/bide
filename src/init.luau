@@ -1,16 +1,16 @@
 --[=[
-	@class videkery
-	videkery UI 라이브러리 메인 진입점입니다.
+	@class bide
+	bide UI 라이브러리 메인 진입점입니다.
 
 	```luau
-	local videkery = require("videkery")
+	local bide = require("bide")
 
-	videkery.Components.Button({ Text = "확인", OnClick = fn })
-	videkery.Core.Interactive({
-		videkery.Behaviors.Highlight(), 
-		videkery.Behaviors.Clickable({ OnClick = fn }) 
+	bide.Components.Button({ Text = "확인", OnClick = fn })
+	bide.Core.Interactive({
+		bide.Behaviors.Highlight(), 
+		bide.Behaviors.Clickable({ OnClick = fn }) 
 	})
-	videkery.Core.Element({ Class = "Frame", Size = ... })
+	bide.Core.Element({ Class = "Frame", Size = ... })
 	```
 ]=]
 
@@ -26,7 +26,7 @@ local Modifier = require("@self/Modifier")
 
 local Props = require("@self/Utils/Props")
 
-local videkery = {
+local bide = {
 	Core = Core,
 
 	Behaviors = Behaviors,
@@ -37,4 +37,4 @@ local videkery = {
 	Props = Props,
 }
 
-return videkery
+return bide

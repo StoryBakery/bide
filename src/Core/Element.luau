@@ -1,7 +1,7 @@
 --[=[
 	@class Element
 
-	모든 videkery 컴포넌트의 기본 래퍼입니다.
+	모든 bide 컴포넌트의 기본 래퍼입니다.
 	Roblox GuiObject 를 생성하고 테마 기본값과 UICorner/UIStroke를 적용합니다.
 ]=]
 
