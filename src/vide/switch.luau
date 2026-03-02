@@ -1,34 +1,36 @@
 local branch = require("./branch")
 local effect = require("./effect")
-local source = require("./source")
+local signal = require("./signal")
 local timeout = require("./timeout")()
 
 type Array<T> = { T }
 type Map<K, V> = { [K]: V }
-type Source<T> = source.Source<T>
-type Component<T> = (Source<boolean>) -> (T, ...number)
+type SignalAccessor<T> = signal.SignalAccessor<T>
+type SignalSetter<T> = signal.SignalSetter<T>
+type Component<T> = (SignalAccessor<boolean>) -> (T, ...number)
 
 local function switch_map<K, Obj>(
-	input: Source<K>,
+	input: SignalAccessor<K>,
 	map: Map<K, Component<Obj>>
-): Source<nil | Obj | Array<Obj>>
+): SignalAccessor<nil | Obj | Array<Obj>>
 	local scopes = {} :: Map<K, {
 		destroy: () -> (),
 		object: Obj,
 		delay: number,
-		present: Source<boolean>,
+		present: SignalAccessor<boolean>,
+		setPresent: SignalSetter<boolean>,
 		timeout: { cancel: boolean }?,
 	}>
 
-	local output = source(nil :: nil | Obj | Array<Obj>)
-	local function update_output()
+	local output, setOutput = signal(nil :: nil | Obj | Array<Obj>)
+	local function updateOutput()
 		local objects = {} :: Array<Obj>
 
 		for _, scope in scopes do
 			objects[#objects + 1] = scope.object
 		end
 
-		output(if objects[2] then objects elseif objects[1] then objects[1] else nil)
+		setOutput(if objects[2] then objects elseif objects[1] then objects[1] else nil)
 	end
 
 	effect(function()
@@ -40,7 +42,7 @@ local function switch_map<K, Obj>(
 				continue
 			end
 
-			scope.present(false)
+			scope.setPresent(false)
 
 			if scope.delay == 0 then
 				scope.destroy()
@@ -50,7 +52,7 @@ local function switch_map<K, Obj>(
 					scope.timeout = timeout(scope.delay, function()
 						scope.destroy()
 						scopes[k] = nil
-						update_output()
+						updateOutput()
 					end)
 				end
 			end
@@ -61,7 +63,7 @@ local function switch_map<K, Obj>(
 			local scope = scopes[key]
 
 			if scope then
-				scope.present(true)
+				scope.setPresent(true)
 
 				if scope.timeout then
 					scope.timeout.cancel = true
@@ -75,37 +77,38 @@ local function switch_map<K, Obj>(
 						error("map must map a value to a function", 0)
 					end
 
-					local present = source(false)
+					local present, setPresent = signal(false)
 
 					local delay = nil :: number?
 					local destroy, object = branch(function()
-						local object, t = component(present)
-						delay = t
-						return object
+						local childObject, childDelay = component(present)
+						delay = childDelay
+						return childObject
 					end)
 
-					present(true)
+					setPresent(true)
 
 					scopes[key] = {
 						destroy = destroy,
 						object = object,
 						delay = delay or 0,
 						present = present,
+						setPresent = setPresent,
 						timeout = nil,
 					}
 				end
 			end
 		end
 
-		update_output()
+		updateOutput()
 	end)
 
 	return output
 end
 
 local function switch<K, Obj>(
-	input: Source<K>
-): (map: Map<K, Component<Obj>>) -> Source<nil | Obj | Array<Obj>>
+	input: SignalAccessor<K>
+): (map: Map<K, Component<Obj>>) -> SignalAccessor<nil | Obj | Array<Obj>>
 	return function(map)
 		return switch_map(input, map)
 	end

@@ -3,7 +3,18 @@ local testkit = require("./testkit")
 local BENCH, START = testkit.benchmark()
 
 local vide = require("../../src/vide")
-local source = vide.source
+local function source<T>(initialValue: T, options: { equals: boolean | ((T, T) -> boolean)? }?)
+	local value, setValue = vide.signal(initialValue, options)
+
+	return function(...): T
+		if select("#", ...) == 0 then
+			return value()
+		end
+
+		return setValue((... :: any) :: T)
+	end
+end
+
 local derive = vide.derive
 local effect = vide.effect
 local indexes = vide.indexes
@@ -69,10 +80,10 @@ end)
 
 ROOT_BENCH("derive 4 sources", function()
 	local cache = table.create(N)
-	local src = vide.source(1)
-	local src2 = vide.source(2)
-	local src3 = vide.source(3)
-	local src4 = vide.source(4)
+	local src = source(1)
+	local src2 = source(2)
+	local src3 = source(3)
+	local src4 = source(4)
 
 	for i = 1, START(N) do
 		cache[i] = derive(function()
@@ -517,7 +528,7 @@ end)
 TITLE "spring()"
 
 ROOT_BENCH("spring update", function()
-	local root, source, spring = vide.root, vide.source, vide.spring
+	local root, spring = vide.root, vide.spring
 
 	local src = source(0)
 
@@ -535,7 +546,7 @@ ROOT_BENCH("spring update", function()
 end)
 
 ROOT_BENCH("spring step", function()
-	local root, source, spring = vide.root, vide.source, vide.spring
+	local root, spring = vide.root, vide.spring
 
 	local src = source(0)
 

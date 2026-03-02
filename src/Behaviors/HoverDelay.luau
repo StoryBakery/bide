@@ -7,7 +7,7 @@
 local vide = require("../vide")
 
 local effect = vide.effect
-local cleanup = vide.cleanup
+local onCleanup = vide.onCleanup
 
 export type HoverDelayParams = {
 	DelaySeconds: number?,
@@ -62,8 +62,8 @@ local function HoverDelay(params: HoverDelayParams?)
 			else
 				local enterConn = instance.MouseEnter:Connect(onHoverStart)
 				local leaveConn = instance.MouseLeave:Connect(onHoverEnd)
-				cleanup(enterConn)
-				cleanup(leaveConn)
+				onCleanup(enterConn)
+				onCleanup(leaveConn)
 			end
 
 			return {

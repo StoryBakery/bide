@@ -11,17 +11,17 @@ type Child = any
 local function update_property_effect(p: {
 	instance: Instance,
 	property: string,
-	source: () -> unknown,
+	accessor: () -> unknown,
 })
-	(p.instance :: any)[p.property] = p.source()
+	(p.instance :: any)[p.property] = p.accessor()
 	return p
 end
 
 local function update_parent_effect(p: {
 	instance: Instance,
-	source: () -> Instance,
+	accessor: () -> Instance,
 })
-	p.instance.Parent = p.source()
+	p.instance.Parent = p.accessor()
 	return p
 end
 
@@ -30,12 +30,12 @@ local function update_children_effect(p: {
 	instance: Instance,
 	cur_children_set: { [Instance]: true },
 	new_children_set: { [Instance]: true },
-	source: () -> Child,
+	accessor: () -> Child,
 })
 	local cur_children_set: { [Instance]: true } = p.cur_children_set -- cache of all children parented before update
 	local new_children_set: { [Instance]: true } = p.new_children_set -- cache of all children parented after update
 
-	local new_children = p.source() -- all (and only) children that should be parented after this update
+	local new_children = p.accessor() -- all (and only) children that should be parented after this update
 
 	local function process_child(child: Child)
 		if type(child) == "userdata" then
@@ -57,12 +57,12 @@ local function update_children_effect(p: {
 				process_child(nestedChild)
 			end
 		elseif type(child) == "function" then
-			local childSource = child :: () -> Child
+			local childAccessor = child :: () -> Child
 			local node = create_node(assert(get_scope()), update_children_effect :: any, {
 				instance = p.instance,
 				cur_children_set = {},
 				new_children_set = {},
-				source = childSource,
+				accessor = childAccessor,
 			})
 
 			evaluate_node(node)
@@ -89,11 +89,11 @@ local function update_children_effect(p: {
 end
 
 return {
-	property = function(instance, property, source)
+	property = function(instance, property, accessor)
 		local node = create_node(assert_stable_scope(), update_property_effect :: any, {
 			instance = instance,
 			property = property,
-			source = source,
+			accessor = accessor,
 		})
 
 		evaluate_node(node)
@@ -104,7 +104,7 @@ return {
 	parent = function(instance, parent)
 		local node = create_node(assert_stable_scope(), update_parent_effect :: any, {
 			instance = instance,
-			source = parent,
+			accessor = parent,
 		})
 
 		evaluate_node(node)
@@ -117,7 +117,7 @@ return {
 			instance = instance,
 			cur_children_set = {},
 			new_children_set = {},
-			source = children,
+			accessor = children,
 		})
 
 		evaluate_node(node)

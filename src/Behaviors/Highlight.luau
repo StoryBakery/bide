@@ -13,8 +13,9 @@
 local DynamicTimer = require("../../roblox_packages/DynamicTimer")
 local vide = require("../vide")
 
-local read = vide.read
 local effect = vide.effect
+local onCleanup = vide.onCleanup
+local read = vide.read
 
 type Prop<T> = T | (() -> T)
 
@@ -70,8 +71,8 @@ local function Highlight(params: HighlightParams?)
 				local leaveConn = instance.MouseLeave:Connect(function()
 					tweenTo(read(normalColor))
 				end)
-				vide.cleanup(enterConn)
-				vide.cleanup(leaveConn)
+				onCleanup(enterConn)
+				onCleanup(leaveConn)
 			end
 
 			return {

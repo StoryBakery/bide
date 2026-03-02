@@ -31,10 +31,12 @@ local effect = vide.effect
 
 local count = source(0)
 
-local function setup()
+local function setup(dispose)
     effect(function()
         print(count())
     end)
+
+    return dispose
 end
 
 setup() -- error, effect() tried to create a reactive scope with no stable scope

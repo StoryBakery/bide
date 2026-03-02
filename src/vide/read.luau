@@ -1,9 +1,12 @@
-type function read(value: type)
-	return value
-end
+type SignalAccessor<T> = () -> T
+type Readable<T> = T | SignalAccessor<T>
 
-local function read<T>(value: T): read<T>
-	return if type(value) == "function" then (value :: any)() else value
+local function read<T>(value: Readable<T>): T
+	if type(value) == "function" then
+		return ((value :: any) :: SignalAccessor<T>)()
+	end
+
+	return value :: T
 end
 
 return read

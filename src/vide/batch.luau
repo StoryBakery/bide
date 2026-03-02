@@ -1,7 +1,7 @@
 local flags = require("./flags")
 local graph = require("./graph")
 
-local function batch(setter: () -> ())
+local function batch<T...>(setter: () -> T...): T...
 	local already_batching = flags.batch
 	local from = 0
 
@@ -22,6 +22,8 @@ local function batch(setter: () -> ())
 	if not ok then
 		error(`error occured while batching updates: {tostring(err)}`, 0)
 	end
+
+	return unpack(result :: any, 2)
 end
 
 return batch

@@ -165,9 +165,18 @@ local function apply<T>(instance: T & Instance, properties: { [unknown]: unknown
 		(instance :: any)[eventInfo.name]:Connect(eventInfo.listener)
 	end
 
-	for _, queued in actions do
-		for _, callback in queued do
-			callback(instance)
+	local priorities = table.create(4)
+	for priority in actions do
+		priorities[#priorities + 1] = priority
+	end
+	table.sort(priorities)
+
+	for _, priority in priorities do
+		local queued = actions[priority]
+		if queued then
+			for _, callback in queued do
+				callback(instance)
+			end
 		end
 	end
 

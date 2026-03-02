@@ -1,88 +1,91 @@
 local branch = require("./branch")
 local effect = require("./effect")
-local source = require("./source")
+local signal = require("./signal")
 local timeout = require("./timeout")()
 
 type Array<T> = { T }
 type Map<K, V> = { [K]: V }
-type Source<T> = source.Source<T>
+type SignalAccessor<T> = signal.SignalAccessor<T>
+type SignalSetter<T> = signal.SignalSetter<T>
 
 local function indexes<K, V, Obj>(
-	input: Source<Map<K, V>>,
-	component: (Source<V>, K, Source<boolean>) -> (Obj, ...number)
-): Source<Array<Obj>>
-	local update_count = 0
+	input: SignalAccessor<Map<K, V>>,
+	component: (SignalAccessor<V>, K, SignalAccessor<boolean>) -> (Obj, ...number)
+): SignalAccessor<Array<Obj>>
+	local updateCount = 0
 	local scopes = {} :: Map<K, {
 		destroy: () -> (),
 		object: Obj,
 		value: V?,
-		value_source: Source<V>,
+		setValue: SignalSetter<V>,
 		count: number,
 		delay: number,
-		present: Source<boolean>,
+		present: SignalAccessor<boolean>,
+		setPresent: SignalSetter<boolean>,
 		timeout: { cancel: boolean }?,
 	}>
 
-	local output = source({} :: Array<Obj>)
-	local function update_output()
+	local output, setOutput = signal({} :: Array<Obj>)
+	local function updateOutput()
 		local objects = table.create(4) :: Array<Obj>
 
 		for _, scope in scopes do
 			objects[#objects + 1] = scope.object
 		end
 
-		output(objects)
+		setOutput(objects)
 	end
 
 	effect(function()
 		local data = input()
 
-		local count = update_count
-		update_count += 1
+		local count = updateCount
+		updateCount += 1
 
-		local children_need_update = false -- set to true if a scope is created or destroyed
+		local childrenNeedUpdate = false -- set to true if a scope is created or destroyed
 
 		-- create or update scopes
-		for i, v in data do
+		for i, inputValue in data do
 			local scope = scopes[i]
 
 			if scope == nil then -- create new scope and create component
-				local value_source = source(v)
-				local present = source(false)
+				local value, setValue = signal(inputValue)
+				local present, setPresent = signal(false)
 
 				local delay = nil :: number?
 				local destroy, object = branch(function()
-					local object, t = component(value_source, i, present)
-					delay = t
-					return object
+					local childObject, childDelay = component(value, i, present)
+					delay = childDelay
+					return childObject
 				end)
 
-				present(true)
+				setPresent(true)
 
-				children_need_update = true
+				childrenNeedUpdate = true
 
 				scopes[i] = {
 					destroy = destroy,
 					object = object,
-					value = v,
-					value_source = value_source,
+					value = inputValue,
+					setValue = setValue,
 					count = count,
 					delay = delay or 0,
 					present = present,
+					setPresent = setPresent,
 					timeout = nil,
 				}
-				else -- update scope
-					scope.count = count
+			else -- update scope
+				scope.count = count
 
-					if (scope.value :: any) ~= (v :: any) then
-						if scope.timeout then -- index is in input table again; cancel destruction
-							scope.timeout.cancel = true
-							scope.timeout = nil
-						scope.present(true)
+				if (scope.value :: any) ~= (inputValue :: any) then
+					if scope.timeout then -- index is in input table again; cancel destruction
+						scope.timeout.cancel = true
+						scope.timeout = nil
+						scope.setPresent(true)
 					end
 
-					scope.value = v
-					scope.value_source(v)
+					scope.value = inputValue
+					scope.setValue(inputValue)
 				end
 			end
 		end
@@ -90,12 +93,12 @@ local function indexes<K, V, Obj>(
 		-- destroy scopes
 		for i, scope in scopes do
 			if scope.count < count then -- if count is not latest then index is no longer in the input table
-				scope.present(false)
+				scope.setPresent(false)
 
 				if scope.delay == 0 then
 					scope.destroy()
 					scopes[i] = nil
-					children_need_update = true
+					childrenNeedUpdate = true
 				else
 					scope.value = nil -- set to nil for the `scope.value ~= v` check
 					if scope.timeout == nil then
@@ -104,7 +107,7 @@ local function indexes<K, V, Obj>(
 							function() -- todo: possible redundant updates
 								scope.destroy()
 								scopes[i] = nil
-								update_output()
+								updateOutput()
 							end
 						)
 					end
@@ -112,8 +115,8 @@ local function indexes<K, V, Obj>(
 			end
 		end
 
-		if children_need_update then
-			update_output()
+		if childrenNeedUpdate then
+			updateOutput()
 		end
 	end)
 

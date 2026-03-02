@@ -19,7 +19,7 @@ Queues a callback to run when a scope is reran or destroyed.
     ```luau
     local count = source(0)
 
-    local destroy = root(function()
+    local destroy = root(function(dispose)
         effect(function()
             count()
 
@@ -27,7 +27,8 @@ Queues a callback to run when a scope is reran or destroyed.
                 print "cleaned"
             end)
         end)
-    end
+        return dispose
+    end)
 
     -- nothing printed yet
     count(1) -- prints "cleaned"
@@ -155,4 +156,3 @@ Creates a new context.
         end)
     end)
     ```
-

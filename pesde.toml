@@ -1,8 +1,8 @@
-name = "storybakery/videkery"
+name = "storybakery/bide"
 version = "0.0.0"
 description = "A reactive Luau library for creating UI."
 authors = ["centau", "storybakery"]
-repository = "https://github.com/StoryBakery/videkery"
+repository = "https://github.com/StoryBakery/bide"
 license = "MIT"
 includes = ["src/*", "README.md", "pesde.toml"]
 

@@ -113,8 +113,8 @@ local function indexes<I, VI, VO>(
             if cache == nil then -- no scope created for this index, create one
                 local src = source(v)
 
-                local destroy, result = root(function()
-                    return transform(src, i)
+                local result, destroy = root(function(dispose)
+                    return transform(src, i), dispose
                 end)
 
                 index_caches[i] = {

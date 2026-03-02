@@ -1,6 +1,6 @@
 local flags = require("./flags")
 
-export type SourceNode<T> = {
+export type SignalNode<T> = {
 	cache: T,
 	[number]: Node<T>,
 }
@@ -15,7 +15,7 @@ export type Node<T> = {
 	owned: { Node<T> } | false,
 	owner: Node<T> | false,
 
-	parents: { SourceNode<T> },
+	parents: { SignalNode<T> },
 	[number]: Node<T>, -- children
 }
 
@@ -30,7 +30,7 @@ local function efn(err: string)
 		end)
 	end
 
-	trace ..= "\nsource update stacktrace:"
+	trace ..= "\nsignal update stacktrace:"
 	return trace
 end
 
@@ -58,14 +58,12 @@ local function assert_stable_scope(): Node<any>
 	if not scope then
 		local caller_name = debug.info(2, "n")
 		return error(`cannot use {caller_name}() outside a stable or reactive scope`, 0)
-	elseif scope.effect then
-		error("cannot create a new reactive scope inside another reactive scope", 0)
 	end
 
 	return scope
 end
 
-local function push_child(parent: SourceNode<any>, child: Node<any>)
+local function push_child(parent: SignalNode<any>, child: Node<any>)
 	parent[#parent + 1] = child
 	child.parents[#child.parents + 1] = parent
 end
@@ -169,29 +167,26 @@ local update_queue = { n = 0 } :: { n: number, [number]: Node<any> }
 local function evaluate_node(node: Node<any>)
 	if flags.strict then
 		if is_scope_active(node) then
-			error("a scope, that should rerun due to the update of a source, is already active", 0)
+			error("a scope, that should rerun due to the update of a signal, is already active", 0)
 		end
 
 		local initial_value = node.cache
+		local cur_value = node.cache
 
-		for i = 1, 2 do
-			local cur_value = node.cache
+		flush_cleanups(node)
+		destroy_owned(node)
 
-			flush_cleanups(node)
-			destroy_owned(node)
+		push_scope(node)
+		local ok, new_value = ycall(node.effect :: (...any) -> any, cur_value)
+		pop_scope()
 
-			push_scope(node)
-			local ok, new_value = ycall(node.effect :: (...any) -> any, cur_value)
-			pop_scope()
-
-			if not ok then
-				table.clear(update_queue)
-				update_queue.n = 0
-				error(`effect error stacktrace\n{new_value :: string}`, 0)
-			end
-
-				node.cache = new_value
+		if not ok then
+			table.clear(update_queue)
+			update_queue.n = 0
+			error(`effect error stacktrace\n{new_value :: string}`, 0)
 		end
+
+		node.cache = new_value
 
 		return initial_value ~= node.cache
 	else
@@ -215,7 +210,7 @@ local function evaluate_node(node: Node<any>)
 	end
 end
 
-local function queue_children_for_update(node: SourceNode<any>)
+local function queue_children_for_update(node: SignalNode<any>)
 	local i = update_queue.n
 	while node[1] do
 		i += 1
@@ -246,7 +241,7 @@ local function flush_update_queue(from: number)
 	update_queue.n = from
 end
 
-local function update_descendants(root: SourceNode<any>)
+local function update_descendants(root: SignalNode<any>)
 	local n0 = update_queue.n
 	queue_children_for_update(root)
 
@@ -271,7 +266,7 @@ local function update_descendants(root: SourceNode<any>)
 	update_queue.n = n0
 end
 
-local function push_scope_as_child_of(node: SourceNode<any>)
+local function push_scope_as_child_of(node: SignalNode<any>)
 	local scope = get_scope()
 	if scope and scope.effect then -- do not track nodes with no effect
 		push_child(node, scope)
@@ -307,8 +302,8 @@ local function create_node(
 	return node
 end
 
-local function create_source_node(value: any): SourceNode<any>
-	return { cache = value } :: SourceNode<any>
+local function create_signal_node(value: any): SignalNode<any>
+	return { cache = value } :: SignalNode<any>
 end
 
 local function get_children(node: Node<any>): { Node<any> }
@@ -341,7 +336,7 @@ return table.freeze {
 	update_descendants = update_descendants,
 	push_child = push_child,
 	create_node = create_node,
-	create_source_node = create_source_node,
+	create_signal_node = create_signal_node,
 	get_children = get_children,
 	flush_update_queue = flush_update_queue,
 	get_update_queue_length = get_update_queue_length,

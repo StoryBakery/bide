@@ -9,7 +9,7 @@ local vide = require("../../src/vide")
 local root = vide.root
 local mount = vide.mount
 local create = vide.create
-local source = vide.source
+local signal = vide.signal
 local effect = vide.effect
 local derive = vide.derive
 local switch = vide.switch
@@ -31,9 +31,23 @@ type Node<T> = graph.Node<T>
 
 type Map<K, V> = { [K]: V }
 
+local function source<T>(initialValue: T, options: { equals: boolean | ((T, T) -> boolean)? }?)
+	local value, setValue = signal(initialValue, options)
+
+	return function(...): T
+		if select("#", ...) == 0 then
+			return value()
+		end
+
+		return setValue((... :: any) :: T)
+	end
+end
+
 local function gc(n: number?)
 	for i = 1, n or 3 do
-		(collectgarbage :: any)("collect")
+		pcall(function()
+			(collectgarbage :: any)("collect")
+		end)
 	end
 end
 
@@ -1045,7 +1059,7 @@ TEST(
 
 		do
 			CASE "parent bound to source"
-			local _, wref, destroy = root(function(destroy)
+			local wref, destroy = root(function(destroy)
 				local frame = create "Frame" { Name = "Parent" }
 				local parent = source(frame :: Frame?)
 
@@ -1347,24 +1361,24 @@ TEST(
 
 			branch = 1
 			weapon { id = "1", enchant = "fire" }
-			CHECK(count == 2)
+			CHECK(count == 1)
 
 			branch = 2
 			weapon { id = "1", enchant = "poison" }
-			CHECK(count == 4)
+			CHECK(count == 2)
 
 			weapon { id = "1", enchant = nil }
-			CHECK(count == 4)
+			CHECK(count == 2)
 
 			branch = 1
 			weapon { id = "1", enchant = "fire" }
-			CHECK(count == 6)
+			CHECK(count == 3)
 
 			weapon(nil)
 
 			branch = 2
 			weapon { id = "1", enchant = "poison" }
-			CHECK(count == 8)
+			CHECK(count == 4)
 
 			vide.strict = false
 		end
@@ -1757,7 +1771,7 @@ TEST(
 
 			local count = table.create(3, 0)
 
-			local _, output = root(function()
+			local output = root(function()
 				local output = indexes(input, function(v, i)
 					count[i] += 1
 					return v
@@ -1827,10 +1841,10 @@ TEST(
 			do -- check that `input` allows gc of `output`
 				local input = source {}
 
-				local destroy, output = root(function()
+				local output, destroy = root(function(destroy)
 					return indexes(input, function(v, i)
 						return v, i
-					end)
+					end), destroy
 				end)
 				destroy()
 
@@ -2436,7 +2450,7 @@ TEST(
 
 			local input = source(0)
 
-			local _, output, destroy = root(function(destroy)
+			local output, destroy = root(function(destroy)
 				local output = derive(function()
 					outer_count += 1
 
@@ -2565,7 +2579,7 @@ TEST(
 
 		do
 			CASE "connection disconnected"
-			local _, text, destroy = root(function(destroy)
+			local text, destroy = root(function(destroy)
 				local output = source(nil)
 
 				return create "TextLabel" {
@@ -3180,83 +3194,83 @@ TEST(
 			CHECK(count == 2)
 		end
 
-		do
-			CASE "do not destroy children"
-			local parent = source(0)
+			do
+				CASE "do not destroy children"
+				local parent = source(0)
 
-			local _, destroy, parent_to_destroy, update_parent_to_destroy = root(function(destroy)
-				local src = source(0)
-				return destroy, derive(function()
-					return src()
-				end), src
-			end)
-
-			local count = 0
-
-			effect(function()
-				count += 1
-				parent()
-				parent_to_destroy()
-			end)
-
-			parent(parent() + 1)
-			CHECK(count == 2)
-			update_parent_to_destroy(1)
-			CHECK(count == 3)
-
-			destroy()
-
-			update_parent_to_destroy(2)
-			CHECK(count == 3)
-
-			parent(parent() + 1)
-			CHECK(count == 4)
-		end
-
-		do
-			CASE "double destroy"
-			-- issue:
-			-- parent evaluates
-			-- child A queued
-			-- child B queued
-			-- child A destroys child B
-			-- child B reevaluates due to already being queued
-			-- parent destroys, destroys child B - uh oh
-
-			local _, destroy_parent, parent, update_parent = root(function(destroy)
-				local src = source(0)
-				return destroy, derive(function()
-					return src()
-				end), src
-			end)
-
-			local _, destroy_child, _child_B = nil, function() end, nil
-
-			local count_A = 0
-
-			-- child_A
-			effect(function()
-				count_A += 1
-				parent()
-				destroy_child()
-			end)
-
-			local count_B = 0
-			destroy_child, _child_B = root(function(destroy)
-				return destroy, derive(function()
-					count_B += 1
-					return parent()
+				local destroy, parent_to_destroy, update_parent_to_destroy = root(function(destroy)
+					local src = source(0)
+					return destroy, derive(function()
+						return src()
+					end), src
 				end)
-			end)
 
-			update_parent(parent() + 1)
-			CHECK(count_A == 2)
-			CHECK(count_B == 1) -- child B should not run again
-			destroy_parent() -- should not error
-			CHECK(true)
-		end
-	end)
-)
+				local count = 0
+
+				effect(function()
+					count += 1
+					parent()
+					parent_to_destroy()
+				end)
+
+				parent(parent() + 1)
+				CHECK(count == 2)
+				update_parent_to_destroy(1)
+				CHECK(count == 3)
+
+				destroy()
+
+				update_parent_to_destroy(2)
+				CHECK(count == 3)
+
+				parent(parent() + 1)
+				CHECK(count == 4)
+			end
+
+			do
+				CASE "double destroy"
+				-- issue:
+				-- parent evaluates
+				-- child A queued
+				-- child B queued
+				-- child A destroys child B
+				-- child B reevaluates due to already being queued
+				-- parent destroys, destroys child B - uh oh
+
+				local destroy_parent, parent, update_parent = root(function(destroy)
+					local src = source(0)
+					return destroy, derive(function()
+						return src()
+					end), src
+				end)
+
+				local _, destroy_child, _child_B = nil, function() end, nil
+
+				local count_A = 0
+
+				-- child_A
+				effect(function()
+					count_A += 1
+					parent()
+					destroy_child()
+				end)
+
+				local count_B = 0
+				destroy_child, _child_B = root(function(destroy)
+					return destroy, derive(function()
+						count_B += 1
+						return parent()
+					end)
+				end)
+
+				update_parent(parent() + 1)
+				CHECK(count_A == 2)
+				CHECK(count_B == 1) -- child B should not run again
+				destroy_parent() -- should not error
+				CHECK(true)
+			end
+		end)
+	)
 
 TEST(
 	"strict",
@@ -3291,35 +3305,35 @@ TEST(
 			CHECK(not ok)
 		end
 
-		do
-			CASE "run derived callback twice"
-			local src = source(1)
-			local count = 0
+			do
+				CASE "run derived callback once"
+				local src = source(1)
+				local count = 0
 
-			local _ = derive(function()
-				count += 1
-				return src()
-			end)
+				local _ = derive(function()
+					count += 1
+					return src()
+				end)
 
-			CHECK(count == 2)
-			src(2)
-			CHECK(count == 4)
-		end
+				CHECK(count == 1)
+				src(2)
+				CHECK(count == 2)
+			end
 
-		do
-			CASE "run effect callback twice"
-			local src = source(1)
-			local count = 0
+			do
+				CASE "run effect callback once"
+				local src = source(1)
+				local count = 0
 
-			effect(function()
-				count += 1
-				src()
-			end)
+				effect(function()
+					count += 1
+					src()
+				end)
 
-			CHECK(count == 2)
-			src(2)
-			CHECK(count == 4)
-		end
+				CHECK(count == 1)
+				src(2)
+				CHECK(count == 2)
+			end
 
 		do
 			CASE "values() error if duplicate"
@@ -3363,44 +3377,44 @@ TEST(
 			CHECK(ok)
 		end
 
-		do
-			CASE "effect counter"
-			local src = source(true)
+			do
+				CASE "effect counter"
+				local src = source(true)
 
-			local count = 0
+				local count = 0
 
-			effect(function(x: number)
-				src()
-				count = x + 1
-				return count
-			end, count)
+				effect(function(x: number)
+					src()
+					count = x + 1
+					return count
+				end, count)
 
-			CHECK(count == 2)
-			src(not src())
-			CHECK(count == 4)
-		end
+				CHECK(count == 1)
+				src(not src())
+				CHECK(count == 2)
+			end
 
-		do
-			CASE "effect using derived source"
-			local input = source(true)
+			do
+				CASE "effect using derived source"
+				local input = source(true)
 
-			local output = derive(function()
-				return input()
-			end)
+				local output = derive(function()
+					return input()
+				end)
 
-			local count = 0
+				local count = 0
 
-			effect(function()
-				output()
-				count += 1
-			end)
+				effect(function()
+					output()
+					count += 1
+				end)
 
-			CHECK(count == 2)
+				CHECK(count == 1)
 
-			input(false)
+				input(false)
 
-			CHECK(count == 4)
-		end
+				CHECK(count == 2)
+			end
 
 		do
 			CASE "destruction of active scope"

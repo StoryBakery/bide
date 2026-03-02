@@ -7,36 +7,24 @@
 
 local vide = require("../../vide")
 
-local source = vide.source
+local signal = vide.signal
 local read = vide.read
 
 local function createState<T>(initialValue: T)
-	local state = source(initialValue)
-
-	local function setValue(nextValue: T | ((T) -> T))
-		if type(nextValue) == "function" then
-			local updater = (nextValue :: any) :: (T) -> T
-			state(updater(state()))
-		else
-			state(nextValue)
-		end
-	end
-
-	local function getValue(): T
-		return state()
-	end
-
-	return getValue, setValue
+	return signal(initialValue)
 end
 
-local function resolveValueSource<T>(customValue: T | (() -> T) | nil, defaultGetter: () -> T): () -> T
+local function resolveSignalValue<T>(
+	customValue: T | (() -> T) | nil,
+	defaultAccessor: () -> T
+): () -> T
 	if customValue ~= nil then
 		return function()
 			return read(customValue)
 		end
 	end
 
-	return defaultGetter
+	return defaultAccessor
 end
 
 local function getVector2Axis(value: Vector2, axis: "X" | "Y"): number
@@ -75,7 +63,7 @@ export type VirtualScrollState = {
 	getScrollDeltaScale: () -> number,
 	getVector2Axis: (Vector2, "X" | "Y") -> number,
 	createState: typeof(createState),
-	resolveValueSource: typeof(resolveValueSource),
+	resolveSignalValue: typeof(resolveSignalValue),
 }
 
 local function createVirtualScrollState(config: VirtualScrollStateConfig): VirtualScrollState
@@ -129,7 +117,7 @@ local function createVirtualScrollState(config: VirtualScrollStateConfig): Virtu
 		getScrollDeltaScale = getScrollDeltaScale,
 		getVector2Axis = getVector2Axis,
 		createState = createState,
-		resolveValueSource = resolveValueSource,
+		resolveSignalValue = resolveSignalValue,
 	}
 end
 

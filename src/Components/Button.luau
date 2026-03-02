@@ -27,8 +27,8 @@ local area = require("../Contexts/Area")
 local theme = require("../Contexts/Theme")
 
 local create = vide.create
+local signal = vide.signal
 local read = vide.read
-local source = vide.source
 
 type Prop<T> = T | (() -> T)
 
@@ -160,7 +160,7 @@ end
 local function Button(props: ButtonProps): GuiBase2d
 	local owned, forward, children = Props.extract(props :: any, OWNED_KEY_SET)
 
-	local isHighlight = source(false)
+	local _, setIsHighlight = signal(false)
 
 	-- 색상 getter
 	local function getButtonColor(): Color3
@@ -215,10 +215,10 @@ local function Button(props: ButtonProps): GuiBase2d
 		OnEnter = owned.OnEnter,
 		OnLeave = owned.OnLeave,
 		OnHoverBegin = function()
-			(isHighlight :: any)(true)
+			setIsHighlight(true)
 		end,
 		OnHoverEnd = function()
-			(isHighlight :: any)(false)
+			setIsHighlight(false)
 		end,
 		UserInputManager = area().UserInputManager,
 	})

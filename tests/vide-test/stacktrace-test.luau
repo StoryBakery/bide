@@ -1,9 +1,21 @@
 local vide = require("../../src/vide")
 
+local function source<T>(initialValue: T, options: { equals: boolean | ((T, T) -> boolean)? }?)
+	local value, setValue = vide.signal(initialValue, options)
+
+	return function(...): T
+		if select("#", ...) == 0 then
+			return value()
+		end
+
+		return setValue((... :: any) :: T)
+	end
+end
+
 do
 	print "============================================================="
 
-	local a = vide.source(1)
+	local a = source(1)
 
 	local cause_error = false
 
@@ -33,9 +45,9 @@ end
 do
 	print "============================================================="
 
-	local a = vide.source(1)
-	local b = vide.source(1)
-	local c = vide.source(1)
+	local a = source(1)
+	local b = source(1)
+	local c = source(1)
 
 	local cause_error = false
 
@@ -75,9 +87,9 @@ end
 do
 	print "============================================================="
 
-	local a = vide.source(1)
-	local b = vide.source(1)
-	local c = vide.source(1)
+	local a = source(1)
+	local b = source(1)
+	local c = source(1)
 
 	local cause_error = false
 

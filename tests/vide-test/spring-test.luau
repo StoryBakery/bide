@@ -1,11 +1,23 @@
 local vide = require("../../src/vide")
 
+local function source<T>(initialValue: T, options: { equals: boolean | ((T, T) -> boolean)? }?)
+	local value, setValue = vide.signal(initialValue, options)
+
+	return function(...): T
+		if select("#", ...) == 0 then
+			return value()
+		end
+
+		return setValue((... :: any) :: T)
+	end
+end
+
 local function system(): (number) -> number
 	local MAX = 40
 	local MIN = 10
 
-	local _, input, output = vide.root(function()
-		local input = vide.source(MAX)
+	local input, output = vide.root(function()
+		local input = source(MAX)
 		local output = vide.spring(input, 1, 0.3)
 		return input, output
 	end)

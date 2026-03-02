@@ -1,32 +1,32 @@
 local derive = require("./derive")
 local effect = require("./effect")
-local source = require("./source")
+local signal = require("./signal")
 local switch = require("./switch")
 
 type Array<T> = { T }
-type Source<T> = source.Source<T>
+type SignalAccessor<T> = signal.SignalAccessor<T>
 
 local function show<T, Obj>(
-	input: Source<T?>,
-	component: (Source<T>, Source<boolean>) -> (Obj, ...number),
-	fallback: ((Source<boolean>) -> (Obj, ...number))?
-): Source<nil | Obj | Array<Obj>>
-	local filtered_input = source(nil :: T?)
+	input: SignalAccessor<T?>,
+	component: (SignalAccessor<T>, SignalAccessor<boolean>) -> (Obj, ...number),
+	fallback: ((SignalAccessor<boolean>) -> (Obj, ...number))?
+): SignalAccessor<nil | Obj | Array<Obj>>
+	local filteredInput, setFilteredInput = signal(nil :: T?)
 
 	effect(function()
-		local v = input()
-		if v then
-			filtered_input(v)
+		local value = input()
+		if value then
+			setFilteredInput(value)
 		end
 	end)
 
-	local input_is_truthy = derive(function()
+	local inputIsTruthy = derive(function()
 		return not not input()
 	end)
 
-	return switch(input_is_truthy) {
+	return switch(inputIsTruthy) {
 		[true] = function(present)
-			return component(filtered_input :: any, present)
+			return component(filteredInput :: any, present)
 		end,
 		[false] = fallback :: any,
 	}

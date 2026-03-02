@@ -57,7 +57,19 @@ local function create<Name>(
 end
 
 local vide = require("../../src/vide")
-local count = vide.source(0)
+local function source<T>(initialValue: T, options: { equals: boolean | ((T, T) -> boolean)? }?)
+	local value, setValue = vide.signal(initialValue, options)
+
+	return function(...): T
+		if select("#", ...) == 0 then
+			return value()
+		end
+
+		return setValue((... :: any) :: T)
+	end
+end
+
+local count = source(0)
 create("TextButton") { -- todo: why is `:: "TextButton"` not necessary?
 	BackgroundTransparency = 1,
 	AnchorPoint = "bad value", -- should error

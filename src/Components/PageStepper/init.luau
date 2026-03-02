@@ -17,11 +17,11 @@ local TextLabel = require("./TextLabel")
 
 local StepButton = require("@self/StepButton")
 
-local cleanup = vide.cleanup
 local create = vide.create
 local effect = vide.effect
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 local read = vide.read
-local source = vide.source
 
 export type PageStepperProps = {
 
@@ -48,7 +48,7 @@ local function PageStepper(props: PageStepperProps)
 	local pageTweenDuration = read(ownedProps.PageTweenDuration)
 	local onChangingPage = ownedProps.OnChangingPage
 
-	local scrollPos = source(0)
+	local scrollPos, setScrollPos = signal(0)
 	local scrollTween: DynamicTimer.DynamicTween?
 
 	effect(function()
@@ -61,14 +61,14 @@ local function PageStepper(props: PageStepperProps)
 			Goal = currentPage - 1,
 			Duration = pageTweenDuration or 0.2,
 			Callback = function(value)
-				scrollPos(value)
+				setScrollPos(value)
 			end,
 		}) :: DynamicTimer.DynamicTween
 		paddingTween:Play()
 		scrollTween = paddingTween
 	end)
 
-	cleanup(function()
+	onCleanup(function()
 		if scrollTween then
 			scrollTween:Destroy()
 		end

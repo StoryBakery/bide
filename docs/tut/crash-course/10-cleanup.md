@@ -13,13 +13,14 @@ local cleanup = vide.cleanup
 
 local count = source(0)
 
-local destroy = root(function()
+local destroy = root(function(dispose)
     effect(function()
         local x = count()
         cleanup(function() print(x) end)
     end)
 
     cleanup(function() print "root destroyed" end)
+    return dispose
 end)
 
 count(1) -- prints "0"

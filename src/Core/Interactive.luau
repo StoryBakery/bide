@@ -24,7 +24,7 @@ local Props = require("../Utils/Props")
 local createInteractionState = require("./InteractionState")
 
 local action = vide.action
-local cleanup = vide.cleanup
+local onCleanup = vide.onCleanup
 
 export type BehaviorFactory = {
 	apply: (instance: GuiObject, state: any?) -> { Destroy: (() -> ())? }?,
@@ -70,7 +70,7 @@ local function Interactive(props: InteractiveProps): GuiBase2d
 				for _, factory in behaviorFactories do
 					local result = factory.apply(guiObject, interactionState)
 					if result and result.Destroy then
-						cleanup(result.Destroy)
+						onCleanup(result.Destroy)
 					end
 				end
 			end)

@@ -6,7 +6,7 @@ local destroy_node = graph.destroy
 
 local refs = {}
 
-local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
+local function root<T...>(fn: (destroy: () -> ()) -> T...): T...
 	local node = create_node(false, false, false)
 
 	refs[node] = true -- prevent gc of root node
@@ -30,7 +30,7 @@ local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
 		error(`error while running root():\n\n{tostring(result[2])}`, 0)
 	end
 
-	return destroy, unpack(result :: any, 2)
+	return unpack(result :: any, 2)
 end
 
 return root

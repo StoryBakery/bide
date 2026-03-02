@@ -7,8 +7,8 @@
 
 local vide = require("../vide")
 
-local source = vide.source
-local cleanup = vide.cleanup
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 
 local function isClickInput(inputObject: InputObject): boolean
 	local inputType = inputObject.UserInputType
@@ -26,27 +26,27 @@ export type InteractionState = {
 }
 
 local function createInteractionState(instance: GuiObject): InteractionState
-	local isHovered = source(false)
-	local isPressed = source(false)
-	local pressInputObject = source(nil :: InputObject?)
+	local isHovered, setIsHovered = signal(false)
+	local isPressed, setIsPressed = signal(false)
+	local pressInputObject, setPressInputObject = signal(nil :: InputObject?)
 
 	local mouseEnterConn = instance.MouseEnter:Connect(function()
-		isHovered(true)
+		setIsHovered(true)
 	end)
 
 	local mouseLeaveConn = instance.MouseLeave:Connect(function()
-		isHovered(false)
+		setIsHovered(false)
 	end)
 
 	local inputBeganConn = instance.InputBegan:Connect(function(inputObject)
 		if not isClickInput(inputObject) then
 			return
 		end
-		isPressed(true)
-		pressInputObject(inputObject)
+		setIsPressed(true)
+		setPressInputObject(inputObject)
 		inputObject:GetPropertyChangedSignal("UserInputState"):Once(function()
-			isPressed(false)
-			pressInputObject(nil)
+			setIsPressed(false)
+			setPressInputObject(nil)
 		end)
 	end)
 
@@ -56,7 +56,7 @@ local function createInteractionState(instance: GuiObject): InteractionState
 		inputBeganConn:Disconnect()
 	end
 
-	cleanup(destroy)
+	onCleanup(destroy)
 
 	return {
 		isHovered = isHovered,

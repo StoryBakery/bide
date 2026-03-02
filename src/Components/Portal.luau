@@ -8,10 +8,10 @@ local vide = require("../vide")
 
 local Props = require("../Utils/Props")
 
-local cleanup = vide.cleanup
 local create = vide.create
 local effect = vide.effect
-local source = vide.source
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 
 export type LayerCollectorPortalProps = {
 	Position: UDim2?,
@@ -27,24 +27,24 @@ local OWNED_KEY_SET = Props.keySet({
 
 local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 	local ownedProps, forwardProps, children = Props.extract(props :: any, OWNED_KEY_SET)
-	local instanceToFindAncestor = source(nil :: Instance?)
-	local gui2d = source(nil :: GuiBase2d?)
-	local layerCollector = source(nil :: LayerCollector?)
+	local instanceToFindAncestor, setInstanceToFindAncestor = signal(nil :: Instance?)
+	local gui2d, setGui2d = signal(nil :: GuiBase2d?)
+	local layerCollector, setLayerCollector = signal(nil :: LayerCollector?)
 
 	effect(function()
 		local target = instanceToFindAncestor()
 		if target == nil then
-			layerCollector(nil)
-			gui2d(nil)
+			setLayerCollector(nil)
+			setGui2d(nil)
 			return
 		end
 
-		layerCollector(target:FindFirstAncestorWhichIsA("LayerCollector"))
-		gui2d(target:FindFirstAncestorWhichIsA("GuiBase2d"))
+		setLayerCollector(target:FindFirstAncestorWhichIsA("LayerCollector"))
+		setGui2d(target:FindFirstAncestorWhichIsA("GuiBase2d"))
 	end)
 
-	local size = source(UDim2.new())
-	local position = source(UDim2.new())
+	local size, setSize = signal(UDim2.new())
+	local position, setPosition = signal(UDim2.new())
 	local propSize = ownedProps.Size or UDim2.new()
 	local propPosition = ownedProps.Position or UDim2.new()
 
@@ -53,8 +53,8 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 		local currentGui = gui2d()
 
 		if currentLayerCollector == nil or currentGui == nil then
-			size(UDim2.new())
-			position(UDim2.new())
+			setSize(UDim2.new())
+			setPosition(UDim2.new())
 			return
 		end
 
@@ -62,13 +62,13 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 			local currentSize = currentGui.AbsoluteSize
 			local currentPosition = currentGui.AbsolutePosition
 				- currentLayerCollector.AbsolutePosition
-			size(
+			setSize(
 				UDim2.fromOffset(
 					currentSize.X * propSize.X.Scale + propSize.X.Offset,
 					currentSize.Y * propSize.Y.Scale + propSize.Y.Offset
 				)
 			)
-			position(
+			setPosition(
 				UDim2.fromOffset(
 					currentPosition.X + currentSize.X * propPosition.X.Scale + propPosition.X.Offset,
 					currentPosition.Y + currentSize.Y * propPosition.Y.Scale + propPosition.Y.Offset
@@ -80,8 +80,8 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 		local sizeConn = currentGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(update)
 		local positionConn = currentGui:GetPropertyChangedSignal("AbsolutePosition"):Connect(update)
 
-		cleanup(sizeConn)
-		cleanup(positionConn)
+		onCleanup(sizeConn)
+		onCleanup(positionConn)
 	end)
 
 	local portalFrameProps: { [any]: any } = {
@@ -105,7 +105,7 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 
 	return create "Folder" {
 		ref = function(inst)
-			instanceToFindAncestor(inst)
+			setInstanceToFindAncestor(inst)
 		end,
 		Name = "LayerCollectorPortal",
 		PortalFrame = create "Frame"(portalFrameProps),

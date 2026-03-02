@@ -7,8 +7,8 @@
 local DynamicTimer = require("../../roblox_packages/DynamicTimer")
 local vide = require("../vide")
 
-local read = vide.read
 local effect = vide.effect
+local read = vide.read
 
 type Prop<T> = T | (() -> T)
 

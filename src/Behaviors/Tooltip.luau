@@ -7,8 +7,8 @@
 local vide = require("../vide")
 
 local effect = vide.effect
-local cleanup = vide.cleanup
-local source = vide.source
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 local read = vide.read
 local create = vide.create
 
@@ -25,7 +25,7 @@ local function Tooltip(params: TooltipParams?)
 
 	return {
 		apply = function(instance: GuiObject, state: any?)
-			local isVisible = source(false)
+			local isVisible, setIsVisible = signal(false)
 			local delayThread: thread? = nil
 
 			local function showDelayed()
@@ -33,7 +33,7 @@ local function Tooltip(params: TooltipParams?)
 					task.cancel(delayThread)
 				end
 				delayThread = task.delay(delaySeconds, function()
-					isVisible(true)
+					setIsVisible(true)
 					delayThread = nil
 				end)
 			end
@@ -43,7 +43,7 @@ local function Tooltip(params: TooltipParams?)
 					task.cancel(delayThread)
 					delayThread = nil
 				end
-				isVisible(false)
+				setIsVisible(false)
 			end
 
 			if state then
@@ -57,8 +57,8 @@ local function Tooltip(params: TooltipParams?)
 			else
 				local enterConn = instance.MouseEnter:Connect(showDelayed)
 				local leaveConn = instance.MouseLeave:Connect(hide)
-				cleanup(enterConn)
-				cleanup(leaveConn)
+				onCleanup(enterConn)
+				onCleanup(leaveConn)
 			end
 
 			local tooltip = vide.show(isVisible, function()

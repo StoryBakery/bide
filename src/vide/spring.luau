@@ -1,8 +1,8 @@
 local graph = require("./graph")
 type Node<T> = graph.Node<T>
-type SourceNode<T> = graph.SourceNode<T>
+type SignalNode<T> = graph.SignalNode<T>
 local create_node = graph.create_node
-local create_source_node = graph.create_source_node
+local create_signal_node = graph.create_signal_node
 local assert_stable_scope = graph.assert_stable_scope
 local evaluate_node = graph.evaluate_node
 local update_descendants = graph.update_descendants
@@ -34,7 +34,7 @@ type SpringState<T> = {
 	v_123: Vector3,
 	v_456: Vector3, -- current velocity
 
-	source_value: T, -- current value of spring input source
+	inputValue: T, -- current value of spring input
 }
 
 type SpringSettings<T> = ({
@@ -134,11 +134,11 @@ setmetatable(vec6_to_type, invalid_type)
 
 -- maps spring data to its corresponding output node
 -- lifetime of spring data is tied to output node
-local springs: { [SpringState<unknown>]: SourceNode<unknown> } = {}
+local springs: { [SpringState<unknown>]: SignalNode<unknown> } = {}
 setmetatable(springs :: any, { __mode = "v" })
 
 local function spring<T>(
-	source: () -> T,
+	getter: () -> T,
 	period: number?,
 	damping_ratio: number?
 ): (() -> T, SpringSettings<T>)
@@ -171,15 +171,15 @@ local function spring<T>(
 		x1_456 = Vector3.zero,
 		v_456 = Vector3.zero,
 
-		source_value = false :: any,
+		inputValue = false :: any,
 	}
 
-	local output = create_source_node(false :: any)
+	local output = create_signal_node(false :: any)
 
 	local function updater_effect()
-		local value = source()
+		local value = getter()
 		data.x1_123, data.x1_456 = type_to_vec6[typeof(value)](value)
-		data.source_value = value
+		data.inputValue = value
 		springs[data] = output
 		return value
 	end
@@ -191,7 +191,7 @@ local function spring<T>(
 	data.x_123, data.x_456 = data.x1_123, data.x1_456
 
 	-- set output to goal
-	output.cache = data.source_value
+	output.cache = data.inputValue
 
 	local config = function(p)
 		local x = p.position

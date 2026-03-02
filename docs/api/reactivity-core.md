@@ -23,14 +23,16 @@ Runs a function in a new stable scope.
 - **Type**
 
     ```luau
-    function root<T...>(fn: (Destructor) -> T...): (Destructor, T...)
+    function root<T...>(fn: (Destructor) -> T...): T...
 
     type Destructor = () -> ()
     ```
 
 - **Details**
 
-    Returns a destructor and any values returned by the callback.
+    Returns the callback return values.
+
+    If you need to destroy the scope manually, return `Destructor` from the callback.
 
 ## source()
 

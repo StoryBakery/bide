@@ -19,8 +19,8 @@ local theme = require("../Contexts/Theme")
 
 local create = vide.create
 local effect = vide.effect
-local source = vide.source
-local cleanup = vide.cleanup
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 local read = vide.read
 
 type ElementFactory = () -> GuiObject
@@ -169,32 +169,20 @@ local function removeScrollBarSmoother(token: any)
 end
 
 local function createState<T>(initialValue: T)
-	local state = source(initialValue)
-
-	local function setValue(nextValue: T | ((T) -> T))
-		if type(nextValue) == "function" then
-			local updater = (nextValue :: any) :: (T) -> T
-			state(updater(state()))
-		else
-			state(nextValue)
-		end
-	end
-
-	local function getValue(): T
-		return state()
-	end
-
-	return getValue, setValue
+	return signal(initialValue)
 end
 
-local function resolveValueSource<T>(customValue: T | (() -> T) | nil, defaultGetter: () -> T): () -> T
+local function resolveSignalValue<T>(
+	customValue: T | (() -> T) | nil,
+	defaultAccessor: () -> T
+): () -> T
 	if customValue ~= nil then
 		return function()
 			return read(customValue)
 		end
 	end
 
-	return defaultGetter
+	return defaultAccessor
 end
 
 local function getElementKey(element: any, fallbackKey: any)
@@ -329,13 +317,13 @@ local function CullingListFrame(
 		return (read(localProps.FadeDuration) :: number?) or 0.5
 	end
 
-	local getScrollBarColor = resolveValueSource(localProps.ScrollBarColor, function()
+	local getScrollBarColor = resolveSignalValue(localProps.ScrollBarColor, function()
 		return theme().ScrollBar
 	end)
-	local getCullingFadeColor = resolveValueSource(localProps.CullingFadeColor, function()
+	local getCullingFadeColor = resolveSignalValue(localProps.CullingFadeColor, function()
 		return theme().CullingFade
 	end)
-	local getCullingFadeTransparency = resolveValueSource(
+	local getCullingFadeTransparency = resolveSignalValue(
 		localProps.CullingFadeTransparency,
 		function()
 			return theme().CullingFadeTransparency
@@ -551,7 +539,7 @@ local function CullingListFrame(
 			end
 		end)
 
-		cleanup(function()
+		onCleanup(function()
 			scrollConn:Disconnect()
 		end)
 	end)
@@ -568,7 +556,7 @@ local function CullingListFrame(
 			setFrameSize(getVector2Axis(scrollingFrame.AbsoluteSize, getScrollingDirection()))
 		end)
 
-		cleanup(function()
+		onCleanup(function()
 			conn:Disconnect()
 		end)
 	end)
@@ -659,7 +647,7 @@ local function CullingListFrame(
 			end)
 		end)
 
-		cleanup(function()
+		onCleanup(function()
 			removeScrollBarSmoother(scrollBarSmootherToken)
 		end)
 	end)
@@ -919,7 +907,7 @@ local function CullingListFrame(
 		lastIndexesByKeyRef.current = elementIndexesByKey
 	end)
 
-	cleanup(function()
+	onCleanup(function()
 		removeScrollBarSmoother(scrollBarDragToken)
 		removeScrollBarSmoother(scrollBarSmootherToken)
 

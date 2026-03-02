@@ -11,9 +11,10 @@ local vide = require("../vide")
 local ImageLabel = require("./ImageLabel")
 local Props = require("../Utils/Props")
 
-local cleanup = vide.cleanup
 local effect = vide.effect
-local source = vide.source
+local memo = vide.memo
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 local read = vide.read
 
 local PROP_SCHEMA = {
@@ -46,20 +47,21 @@ local function AnimationFrame(props: AnimationFrameProps)
 	local autoPlayProp = localProps.AutoPlay
 	local fpsProp = localProps.Fps
 
-	local totalFrames = vide.derive(function()
+	local totalFrames = memo(function()
 		return #(read(imageContentsProp) or {})
 	end)
 
-	local currentFrameIndex = source(getInitialFrame(read(frameProp), totalFrames()))
+	local currentFrameIndex, setCurrentFrameIndex =
+		signal(getInitialFrame(read(frameProp), totalFrames()))
 
 	effect(function()
 		local total = totalFrames()
 		local frame = read(frameProp) or 1
 
 		if total > 0 then
-			currentFrameIndex(math.clamp(frame, 1, total))
+			setCurrentFrameIndex(math.clamp(frame, 1, total))
 		else
-			currentFrameIndex(0)
+			setCurrentFrameIndex(0)
 		end
 
 		return nil
@@ -82,7 +84,7 @@ local function AnimationFrame(props: AnimationFrameProps)
 			local frameForAutoplay = currentFrameIndex()
 			if frameForAutoplay == 0 or frameForAutoplay > total then
 				frameForAutoplay = 1
-				currentFrameIndex(1)
+				setCurrentFrameIndex(1)
 			end
 
 			local conn = RunService.RenderStepped:Connect(function(dt: number)
@@ -95,11 +97,11 @@ local function AnimationFrame(props: AnimationFrameProps)
 					if nextFrame > total then
 						nextFrame = 1
 					end
-					currentFrameIndex(nextFrame)
+					setCurrentFrameIndex(nextFrame)
 				end
 			end)
 
-			cleanup(conn)
+			onCleanup(conn)
 		end
 
 		return nil

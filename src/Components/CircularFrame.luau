@@ -11,9 +11,9 @@ local Gradient = require("../Layout/Gradient")
 local Props = require("../Utils/Props")
 
 local action = vide.action
-local cleanup = vide.cleanup
 local create = vide.create
-local derive = vide.derive
+local memo = vide.memo
+local onCleanup = vide.onCleanup
 local read = vide.read
 
 type Prop<T> = T | (() -> T)
@@ -146,7 +146,7 @@ local function createPropChildrenContainer(positionX: number, childFolder: Insta
 		clonedFolder,
 	}
 	props[#props + 1] = action(function()
-		cleanup(followedFolder.Destroy)
+		onCleanup(followedFolder.Destroy)
 	end)
 
 	return create "Frame"(props :: any)
@@ -281,7 +281,7 @@ local function CircularFrame(props: CircularFrameProps)
 		return value
 	end
 
-	local anglesSignal = derive(function()
+	local anglesSignal = memo(function()
 		local startProgress = getStartProgress()
 		local endProgress = getEndProgress()
 		return computeAngles(startProgress, endProgress)

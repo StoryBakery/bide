@@ -4,8 +4,8 @@ local push_scope_as_child_of = graph.push_scope_as_child_of
 local assert_stable_scope = graph.assert_stable_scope
 local evaluate_node = graph.evaluate_node
 
-local function derive<T>(source: () -> T): () -> T
-	local node = create_node(assert_stable_scope(), source :: any, false :: any)
+local function derive<T>(accessor: () -> T): () -> T
+	local node = create_node(assert_stable_scope(), accessor :: any, false :: any)
 
 	evaluate_node(node)
 

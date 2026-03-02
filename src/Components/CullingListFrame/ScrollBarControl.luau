@@ -13,9 +13,9 @@ local Button = require("../Button")
 local Frame = require("../Frame")
 local theme = require("../../Contexts/Theme")
 
-local source = vide.source
 local effect = vide.effect
-local cleanup = vide.cleanup
+local signal = vide.signal
+local onCleanup = vide.onCleanup
 
 local scrollBarSmoothers = {} :: { [any]: (dt: number) -> () }
 local scrollBarSmootherConn: RBXScriptConnection?
@@ -70,16 +70,8 @@ export type ScrollBarHandle = {
 local function createScrollBarControl(config: ScrollBarConfig): ScrollBarHandle
 	local scrollBarDragToken = {}
 	local scrollBarSmootherToken = {}
-	local getScrollBarContainer, setScrollBarContainer = source(nil :: Frame?), nil :: any
-	getScrollBarContainer = source(nil :: Frame?)
-	setScrollBarContainer = function(v)
-		getScrollBarContainer(v)
-	end
-	local getIsClickingScrollBar, setIsClickingScrollBar = source(false), nil :: any
-	getIsClickingScrollBar = source(false)
-	setIsClickingScrollBar = function(v)
-		getIsClickingScrollBar(v)
-	end
+	local getScrollBarContainer, setScrollBarContainer = signal(nil :: Frame?)
+	local getIsClickingScrollBar, setIsClickingScrollBar = signal(false)
 
 	local function updateCursorFromScrollBarInput()
 		local container = getScrollBarContainer()
@@ -163,7 +155,7 @@ local function createScrollBarControl(config: ScrollBarConfig): ScrollBarHandle
 			end)
 		end)
 
-		cleanup(function()
+		onCleanup(function()
 			removeScrollBarSmoother(scrollBarSmootherToken)
 		end)
 	end)

@@ -16,9 +16,6 @@
 
 local vide = require("@self/vide")
 
-export type source<T> = vide.source<T>
-export type context<T> = vide.context<T>
-
 local Core = require("@self/Core")
 
 local Behaviors = require("@self/Behaviors")
