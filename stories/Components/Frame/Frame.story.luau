@@ -1,21 +1,21 @@
 --[[ 
     Frame 컴포넌트의 무지개 반동 스토리입니다.
     - 둥근 모서리(UICorner) 경계에 맞춘 실제 반사(원호 법선 반사)
-    - spring()으로 스쿼시/스트레치
     - 무지개 잔상(풀/링버퍼), UIGradient 회전
     - UI Labs controls → Vide.Source 로 실시간 조정
 ]]
 
 local RunService = game:GetService("RunService")
 
-local vide = require("../../../src/vide")
+local Attachments = require("../../../src/Attachments")
+local Instance = require("../../../src/Instance")
+local reactive = require("../../../src/Reactive")
 
-local create = vide.create
-local effect = vide.effect
-local source = vide.source
-local cleanup = vide.cleanup
-local changed = vide.changed
-local spring = vide.spring
+local create = Instance.create
+local effect = reactive.effect
+local source = reactive.source
+local cleanup = reactive.cleanup
+local changed = Attachments.Changed
 
 local controls = {
 	Speed = 1.0, -- 공 속도 배수
@@ -86,7 +86,7 @@ end
 
 -- ──────────────────────────────────────────────────────────────────────────────
 local story = {
-	vide = vide,
+	reactivetivreactivereactive,
 	controls = controls,
 
 	story = function(props)
@@ -101,9 +101,12 @@ local story = {
 		local hue = source(0.0)
 		local gradRotation = source(0.0)
 
-		-- 스케일(스쿼시/스트레치) 스프링
+		-- 스케일(스쿼시/스트레치)
 		local scaleTarget = source(Vector2.new(1, 1)) -- 기본은 (1,1) 타깃
-		local scale, scaleCfg = spring(scaleTarget, 0.18, 0.85) -- period, damping
+		local scale = scaleTarget
+		local function scaleCfg(_: { impulse: Vector2 })
+			return nil
+		end
 
 		-- 컨트롤 캐시(Heartbeat에서 빠르게 접근)
 		local conf = {
@@ -140,11 +143,11 @@ local story = {
 			BackgroundTransparency = 0,
 			Size = UDim2.fromScale(1, 1),
 			ClipsDescendants = true,
-
-			-- 사이즈 추적
-			changed("AbsoluteSize", function(v: Vector2)
-				containerSize(v)
-			end),
+			Attach = {
+				changed("AbsoluteSize", function(v: Vector2)
+					containerSize(v)
+				end),
+			},
 
 			-- 둥근 경계
 			create("UICorner")({

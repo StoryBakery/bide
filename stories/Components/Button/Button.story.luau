@@ -1,14 +1,17 @@
-local vide = require("../../../src/vide")
+local reactive = require("../../../src/Reactive")
+local Renderer = require("../../../src/Renderer")
 
 local Components = require("../../../src/Components")
 local Layout = require("../../../src/Layout")
-local theme = require("../../../src/Contexts/Theme")
+local Theme = require("../../../src/Contexts/Theme")
 
-local mount = vide.mount
-local source = vide.source
+local mount = Renderer.mount
+local source = reactive.source
 
 local function App()
 	local selected = source(false)
+	local themeContext = reactive.useContext(Theme)
+	local getTheme = themeContext.Get
 
 	return Components.Frame({
 		Size = UDim2.fromScale(1, 1),
@@ -29,10 +32,10 @@ local function App()
 				return if selected() then "선택됨" else "기본 버튼"
 			end,
 			ButtonColor = function()
-				return if selected() then theme().ButtonSelected else theme().Button
+				return if selected() then getTheme().ButtonSelected else getTheme().Button
 			end,
 			TextColor3 = function()
-				return if selected() then theme().ButtonTextOnSelected else theme().ButtonText
+				return if selected() then getTheme().ButtonTextOnSelected else getTheme().ButtonText
 			end,
 			OnClick = function()
 				selected(function(value)

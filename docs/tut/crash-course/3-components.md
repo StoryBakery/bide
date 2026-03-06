@@ -1,22 +1,24 @@
-# Components
+---
+title: Components
+---
 
-Vide encourages separating different parts of your UI into functions called
-*components*.
+Break UI into small reusable functions.
 
-A component is a function that creates and returns a piece of UI.
+## Component shape
 
-This is a way to separate your UI into small chunks that you can reuse and put
-together.
+A component is a function that receives props and returns UI.
 
 ::: code-group
 
 ```luau [Button.luau]
-local create = vide.create
+local bide = require("bide")
+
+local create = bide.Instance.create
 
 local function Button(props: {
     Position: UDim2,
     Text: string,
-    Activated: () -> ()
+    Activated: () -> (),
 })
     return create "TextButton" {
         BackgroundColor3 = Color3.fromRGB(50, 50, 50),
@@ -27,7 +29,7 @@ local function Button(props: {
         Text = props.Text,
         Activated = props.Activated,
 
-        create "UICorner" {}
+        create "UICorner" {},
     }
 end
 
@@ -35,31 +37,32 @@ return Button
 ```
 
 ```luau [Menu.luau]
-local create = vide.create
+local Button = require("./Button")
+local bide = require("bide")
 
-local Button = require(Button)
+local create = bide.Instance.create
 
 local function Menu()
     return create "ScreenGui" {
-        Button {
+        Button({
             Position = UDim2.fromOffset(200, 200),
             Text = "back",
             Activated = function()
-                print "go to previous page"
-            end
-        },
+                print("go to previous page")
+            end,
+        }),
 
-        Button {
+        Button({
             Position = UDim2.fromOffset(400, 200),
             Text = "next",
             Activated = function()
-                print "go to next page"
-            end
-        }
+                print("go to next page")
+            end,
+        }),
     }
 end
 ```
 
 :::
 
-A single parameter `props` is used to pass properties to the component.
+Use a single `props` table so components stay easy to compose and extend.

@@ -2,21 +2,16 @@
     @class UIScaleWrapper
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
 
-local Props = require("../Utils/Props")
-
-local create = vide.create
-
-local EMPTY_KEY_SET = {}
+local create = Instance.create
 
 export type ScaleProps = {
 	Scale: number,
 }
 
 local function Scale(props: ScaleProps)
-	local _, restProps = Props.splitProps(props :: any, EMPTY_KEY_SET)
-	return create "UIScale"(Props.composeProps({}, restProps :: any, props :: any))
+	return create "UIScale"(props :: any)
 end
 
 return Scale

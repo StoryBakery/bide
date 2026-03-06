@@ -1,7 +1,7 @@
-local area = require("@self/area")
-local theme = require("@self/theme")
+local Area = require("@self/Area")
+local Theme = require("@self/Theme")
 
 return {
-	area = area,
-	theme = theme,
+	Area = Area,
+	Theme = Theme,
 }

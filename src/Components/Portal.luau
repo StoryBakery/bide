@@ -4,29 +4,29 @@
 	LayerCollector 기준으로 포탈을 생성하는 컴포넌트입니다.
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
+local reactive = require("../Reactive")
 
 local Props = require("../Utils/Props")
 
-local create = vide.create
-local effect = vide.effect
-local signal = vide.signal
-local onCleanup = vide.onCleanup
+local create = Instance.create
+local effect = reactive.effect
+local signal = reactive.signal
+local cleanup = reactive.cleanup
+local read = reactive.read
 
-export type LayerCollectorPortalProps = {
-	Position: UDim2?,
-	Size: UDim2?,
-	ZIndex: number?,
+local OWN_PROPS_SCHEMA = {
+	Position = Props.optional<<UDim2>>(),
+	Size = Props.optional<<UDim2>>(),
+	ZIndex = Props.optional<<number>>(),
 }
 
-local OWNED_KEY_SET = Props.keySet({
-	"Position",
-	"Size",
-	"ZIndex",
-})
+export type LayerCollectorPortalOwnProps = typeof(OWN_PROPS_SCHEMA)
+
+export type LayerCollectorPortalProps = LayerCollectorPortalOwnProps
 
 local function LayerCollectorPortal(props: LayerCollectorPortalProps)
-	local ownedProps, forwardProps, children = Props.extract(props :: any, OWNED_KEY_SET)
+	local ownProps, forwardProps, children = Props.splitProps(props :: any, OWN_PROPS_SCHEMA)
 	local instanceToFindAncestor, setInstanceToFindAncestor = signal(nil :: Instance?)
 	local gui2d, setGui2d = signal(nil :: GuiBase2d?)
 	local layerCollector, setLayerCollector = signal(nil :: LayerCollector?)
@@ -45,12 +45,12 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 
 	local size, setSize = signal(UDim2.new())
 	local position, setPosition = signal(UDim2.new())
-	local propSize = ownedProps.Size or UDim2.new()
-	local propPosition = ownedProps.Position or UDim2.new()
 
 	effect(function()
 		local currentLayerCollector = layerCollector()
 		local currentGui = gui2d()
+		local propSize = (read(ownProps.Size) :: UDim2?) or UDim2.new()
+		local propPosition = (read(ownProps.Position) :: UDim2?) or UDim2.new()
 
 		if currentLayerCollector == nil or currentGui == nil then
 			setSize(UDim2.new())
@@ -80,8 +80,8 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 		local sizeConn = currentGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(update)
 		local positionConn = currentGui:GetPropertyChangedSignal("AbsolutePosition"):Connect(update)
 
-		onCleanup(sizeConn)
-		onCleanup(positionConn)
+		cleanup(sizeConn)
+		cleanup(positionConn)
 	end)
 
 	local portalFrameProps: { [any]: any } = {
@@ -93,7 +93,7 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 		Position = function()
 			return position()
 		end,
-		ZIndex = ownedProps.ZIndex,
+		ZIndex = ownProps.ZIndex,
 		Parent = function()
 			return layerCollector()
 		end,
@@ -101,7 +101,9 @@ local function LayerCollectorPortal(props: LayerCollectorPortalProps)
 	for key, value in forwardProps do
 		portalFrameProps[key] = value
 	end
-	Props.appendChildren(portalFrameProps, children)
+	if #children > 0 then
+		table.move(children, 1, #children, #portalFrameProps + 1, portalFrameProps)
+	end
 
 	return create "Folder" {
 		ref = function(inst)

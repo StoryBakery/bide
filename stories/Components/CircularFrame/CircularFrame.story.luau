@@ -1,13 +1,14 @@
 local RunService = game:GetService("RunService")
 
-local vide = require("../../../src/vide")
+local reactive = require("../../../src/Reactive")
+local Renderer = require("../../../src/Renderer")
 
 local Components = require("../../../src/Components")
 local Layout = require("../../../src/Layout")
 
-local effect = vide.effect
-local mount = vide.mount
-local source = vide.source
+local effect = reactive.effect
+local mount = Renderer.mount
+local source = reactive.source
 
 local function clampProgress(value: number): number
 	return math.clamp(value, 0, 1)
@@ -30,7 +31,7 @@ local function App()
 			endProgress(nextEndProgress)
 		end)
 
-		vide.cleanup(conn)
+		reactive.cleanup(conn)
 		return nil
 	end)
 

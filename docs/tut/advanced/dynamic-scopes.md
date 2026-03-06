@@ -1,66 +1,31 @@
-# Dynamic Scopes
+---
+title: Dynamic Scopes
+---
 
-Dynamic scopes are scopes that are created and destroyed in response to
-source updates. This is needed for conditionally rendering parts of your UI,
-such as opening and closing menus.
+Dynamic scopes are stable child scopes that appear and disappear in response to
+signal updates.
 
-While Vide provides functions for common ways to do this, this section will
-show how you can implement them yourself so you are not limited by only what is
-provided.
+## Recreating show()
 
-## Recreating [`show()`](/api/reactivity-dynamic#show-reactive)
-
-The most basic one, `show()`, can be
-implemented yourself like so:
+A minimal `show()` can be modeled with `memo()` and `untrack()`.
 
 ```luau
 local function show(toggle: () -> unknown, component: () -> Instance)
-    return derive(function()
+    return memo(function()
         return if toggle() then untrack(component) else nil
     end)
 end
 ```
 
-The main thing to note here is the use of `untrack()`. This function runs its
-callback in a new stable scope. Without this, if the component were to create
-a reactive scope, an error would occur since a reactive scope cannot be created
-within a reactive scope.
+`untrack()` keeps the component's internal signal reads from being tracked by the
+outer `memo()`. That way the branch only depends on `toggle()`.
 
-```mermaid
-%%{init: {
-    "theme": "base",
-    "themeVariables": {
-        "primaryColor": "#111720",
-        "primaryTextColor": "#fff",
-        "primaryBorderColor": "#444455",
-        "lineColor": "#79B8FF",
-        "tertiaryColor": "#0d131b",
-        "tertiaryBorderColor": "#444455"
-    }
-}}%%
-
-graph
-
-subgraph derive ["derive (reactive)"]
-
-    subgraph untrack ["untrack (stable)"]
-        subgraph effect ["effect (reactive)"]
-
-        end
-    end
-end
-```
-
-You can see from the above graph how the effect would not be created directly
-inside the derive, there is a stable scope between them. This requirement exists
-as a guard against unintentional rerendering of UI.
-
-## Recreating [`switch()`](/api/reactivity-dynamic#switch-reactive)
+## Recreating switch()
 
 ```luau
 local function switch(key)
     return function(map)
-        return derive(function()
+        return memo(function()
             local component = map[key()]
             return if component then untrack(component) else nil
         end)
@@ -68,81 +33,74 @@ local function switch(key)
 end
 ```
 
-## Recreating [`indexes()`](/api/reactivity-dynamic#indexes-reactive)
+## Recreating indexes()
 
-This is a more complicated function because it manages multiple scopes at the
-same time, unlike the previous functions. Because some scopes may persist
-between reruns, we cannot use `untrack()` anymore which automatically destroys
-on rerun; we must use `root()` where the lifetime of each scope is managed
-manually and independently.
+`indexes()` is more involved because multiple child scopes must stay alive across
+updates.
 
 ```luau
 local function indexes<I, VI, VO>(
-    input: () -> Map<I, VI>,
+    input: () -> { [I]: VI },
     transform: (value: () -> VI, index: I) -> VO
 )
-    local index_caches = {} :: Map<I, {
-        previous_input: VI,
-        output: VO,
-        source: (VI) -> VI,
-        destroy: () -> ()
-    }?>
+    local caches = {} :: {
+        [I]: {
+            destroy: () -> (),
+            output: VO,
+            previousInput: VI,
+            setValue: (VI) -> VI,
+        }?,
+    }
 
-    -- destroy all scopes if the parent scope is destroyed
     cleanup(function()
-        for _, cache in index_caches do
+        for _, cache in caches do
             assert(cache).destroy()
         end
     end)
 
-    return derive(function()
-        local new_input = input()
+    return memo(function()
+        local nextInput = input()
 
-        -- destroy scopes of removed indexes
-        for i, cache in index_caches do
-            if new_input[i] == nil then
+        for index, cache in caches do
+            if nextInput[index] == nil then
                 assert(cache).destroy()
-                index_caches[i] = nil
+                caches[index] = nil
             end
         end
 
-        -- create scopes or update sources of added or changed index values
-        for i, v in new_input do
-            local cache = index_caches[i]
+        for index, value in nextInput do
+            local cache = caches[index]
 
-            if cache == nil then -- no scope created for this index, create one
-                local src = source(v)
+            if cache == nil then
+                local currentValue, setValue = signal(value)
 
-                local result, destroy = root(function(dispose)
-                    return transform(src, i), dispose
+                local output, destroy = root(function(dispose)
+                    return transform(currentValue, index), dispose
                 end)
 
-                index_caches[i] = {
+                caches[index] = {
                     destroy = destroy,
-                    source = src,
-                    output = result,
-                    previous_input = v
+                    output = output,
+                    previousInput = value,
+                    setValue = setValue,
                 }
-            elseif cache.previous_input ~= v then -- scope exists, update source
-                cache.previous_input = v
-                cache.source(v)
-            else -- scope exists and value has not changed; do nothing
+            elseif cache.previousInput ~= value then
+                cache.previousInput = value
+                cache.setValue(value)
             end
         end
 
-        -- return the cached output values as an array
-        local array = table.create(#index_caches)
+        local output = table.create(0)
 
-        for _, cache in index_caches do
-            table.insert(array, assert(cache).output)
+        for _, cache in caches do
+            output[#output + 1] = assert(cache).output
         end
-        
-        return array
+
+        return output
     end)
 end
 ```
 
---------------------------------------------------------------------------------
-
-Though the above functions are already provided to you by Vide, this serves as
-an example for how you may create your own dynamic scope functions.
+The built-in helpers already handle delayed destruction and branch presence.
+This section is mainly useful when you need a custom dynamic helper that does
+not fit `show()`, `switch()`, `indexes()`, or `values()`.

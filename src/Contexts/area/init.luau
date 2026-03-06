@@ -1,13 +1,14 @@
 local PluginGuiService = game:GetService("PluginGuiService")
 local RunService = game:GetService("RunService")
 
-local DynamicTimer = require("../../roblox_packages/DynamicTimer") :: any
-local ExtendedTranslator = require("../../roblox_packages/ExtendedTranslator") :: any
-local UILabs = require("../../roblox_packages/ui-labs") :: any
-local UserInputManager = require("../../roblox_packages/UserInputManager") :: any
-local vide = require("../vide")
+local DynamicTimer = require("../../roblox_packages/DynamicTimer")
+local ExtendedTranslator = require("../../roblox_packages/ExtendedTranslator")
+local UILabs = require("../../roblox_packages/ui-labs")
+local UserInputManager = require("../../roblox_packages/UserInputManager")
 
-local defaultUserInputManager = UserInputManager.GlobalUserInputManager :: any
+local reactive = require("../Reactive")
+
+local defaultUserInputManager = UserInputManager.GlobalUserInputManager
 if RunService:IsStudio() and UILabs.Environment.IsStory() then
 	pcall(function()
 		for i, pluginGui in PluginGuiService:GetChildren() do
@@ -29,8 +30,7 @@ if RunService:IsStudio() and UILabs.Environment.IsStory() then
 	end
 end
 
-local area = vide.context({
-	ResolutionScale = 1 :: number,
+local DEFAULT_AREA_VALUE = table.freeze({
 	UserInputManager = defaultUserInputManager,
 	Translator = ExtendedTranslator.new({
 		LocalizationTables = {},
@@ -38,5 +38,6 @@ local area = vide.context({
 	Timer = DynamicTimer.UITimer,
 })
 
-return area
+local Area = reactive.createContext(DEFAULT_AREA_VALUE)
 
+return Area

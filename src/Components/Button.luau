@@ -2,7 +2,7 @@
 	@class Button
 
 	완전한 버튼 컴포넌트입니다.
-	Interactive + Highlight + PressScale + Ripple + Clickable + Tooltip 을 조합합니다.
+	Frame 루트에 여러 attachment를 조합해 버튼 동작을 만듭니다.
 	Icon과 Text를 자동 레이아웃합니다.
 
 	```luau
@@ -14,98 +14,107 @@
 	```
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
+local reactive = require("../Reactive")
 
-local Clickable = require("../Behaviors/Clickable")
-local Highlight = require("../Behaviors/Highlight")
-local Interactive = require("../Core/Interactive")
-local PressScale = require("../Behaviors/PressScale")
+local Area = require("../Contexts/Area")
+local Clickable = require("../Attachments/Clickable")
+local Frame = require("./Frame")
+local Highlight = require("../Attachments/Highlight")
+local PressScale = require("../Attachments/PressScale")
 local Props = require("../Utils/Props")
-local Ripple = require("../Behaviors/Ripple")
-local Tooltip = require("../Behaviors/Tooltip")
-local area = require("../Contexts/Area")
-local theme = require("../Contexts/Theme")
+local Ripple = require("../Attachments/Ripple")
+local Theme = require("../Contexts/Theme")
+local Tooltip = require("../Attachments/Tooltip")
 
-local create = vide.create
-local signal = vide.signal
-local read = vide.read
+local create = Instance.create
+local read = reactive.read
 
 type Prop<T> = T | (() -> T)
+type ThemeValue = typeof(Theme.BuiltInThemes.Dark)
+type ThemeAccessor = () -> ThemeValue
 
-export type ButtonProps = {
+local OWN_PROPS_SCHEMA = {
+	ButtonColor = Props.optional<<Color3>>(),
+	HighlightColor = Props.optional<<Color3>>(),
+	ClickEffectColor = Props.optional<<Color3>>(),
+	ClickEffectImageContent = Props.optional<<Content>>(),
+	CornerRadius = Props.optional<<number | UDim>>(),
+	Text = Props.optional<<string>>(),
+	TextColor3 = Props.optional<<Color3>>(),
+	TextSize = Props.optional<<number>>(),
+	TextScaled = Props.optional<<boolean>>(),
+	TextXAlignment = Props.optional<<Enum.TextXAlignment>>(),
+	TextYAlignment = Props.optional<<Enum.TextYAlignment>>(),
+	TextTransparency = Props.optional<<number>>(),
+	FontFace = Props.optional<<Font>>(),
+	IconContent = Props.optional<<Content>>(),
+	IconColor = Props.optional<<Color3>>(),
+	AutoScaleEnabled = Props.optional<<boolean>>(),
+	OnClick = Props.optional<<((inputObject: InputObject) -> ())>>(),
+	OnMouseButton1Click = Props.optional<<((inputObject: InputObject) -> ())>>(),
+	OnMouseButton2Click = Props.optional<<((inputObject: InputObject) -> ())>>(),
+	OnMouseButton3Click = Props.optional<<((inputObject: InputObject) -> ())>>(),
+	OnTouch = Props.optional<<((inputObject: InputObject) -> ())>>(),
+	OnEnter = Props.optional<<(() -> ())>>(),
+	OnLeave = Props.optional<<(() -> ())>>(),
+	TooltipText = Props.optional<<string>>(),
+}
+
+export type ButtonOwnProps = typeof(OWN_PROPS_SCHEMA)
+
+type ButtonBaseProps = {
 	-- 외관
-	ButtonColor: Prop<Color3>?,
-	HighlightColor: Prop<Color3>?,
-	ClickEffectColor: Prop<Color3>?,
-	ClickEffectImageContent: Prop<Content>?,
-	CornerRadius: Prop<number | UDim>?,
-
-	-- 텍스트
-	Text: Prop<string>?,
-	TextColor3: Prop<Color3>?,
-	TextSize: number?,
-	TextScaled: boolean?,
-	TextXAlignment: Enum.TextXAlignment?,
-	TextYAlignment: Enum.TextYAlignment?,
-	TextTransparency: number?,
-	FontFace: Font?,
-
-	-- 아이콘
-	IconContent: Prop<Content>?,
-	IconColor: Prop<Color3>?,
-
-	-- 상호작용
-	AutoScaleEnabled: boolean?,
-	OnClick: ((inputObject: InputObject) -> ())?,
-	OnMouseButton1Click: ((inputObject: InputObject) -> ())?,
-	OnMouseButton2Click: ((inputObject: InputObject) -> ())?,
-	OnMouseButton3Click: ((inputObject: InputObject) -> ())?,
-	OnTouch: ((inputObject: InputObject) -> ())?,
-	OnEnter: (() -> ())?,
-	OnLeave: (() -> ())?,
-
-	-- 기타
-	TooltipText: string?,
 	Size: Prop<UDim2>?,
 	Position: Prop<UDim2>?,
 	AnchorPoint: Prop<Vector2>?,
+	Attach: any?,
 	LayoutOrder: Prop<number>?,
 	ZIndex: Prop<number>?,
 	Visible: Prop<boolean>?,
 	AutomaticSize: Prop<Enum.AutomaticSize>?,
 }
 
-local OWNED_KEY_SET = Props.keySet({
-	"AutoScaleEnabled",
-	"ButtonColor",
-	"ClickEffectColor",
-	"ClickEffectImageContent",
-	"CornerRadius",
-	"FontFace",
-	"HighlightColor",
-	"IconContent",
-	"IconColor",
-	"OnClick",
-	"OnEnter",
-	"OnLeave",
-	"OnMouseButton1Click",
-	"OnMouseButton2Click",
-	"OnMouseButton3Click",
-	"OnTouch",
-	"Text",
-	"TextColor3",
-	"TextScaled",
-	"TextSize",
-	"TextTransparency",
-	"TextXAlignment",
-	"TextYAlignment",
-	"TooltipText",
-})
+export type ButtonProps = ButtonOwnProps & ButtonBaseProps
 
 local EMPTY_CONTENT = Content.fromUri("")
 
+local function appendAttach(targetProps: { [any]: any }, attachment: any)
+	if attachment == nil or attachment == false then
+		return
+	end
+
+	if type(attachment) == "function" then
+		local currentAttach = targetProps.Attach
+
+		if currentAttach == nil then
+			targetProps.Attach = { attachment }
+		elseif type(currentAttach) == "function" then
+			targetProps.Attach = { currentAttach, attachment }
+		elseif type(currentAttach) == "table" then
+			currentAttach[#currentAttach + 1] = attachment
+		else
+			error(`Invalid Attach prop type "{type(currentAttach)}"`)
+		end
+
+		return
+	end
+
+	if type(attachment) ~= "table" then
+		error(`Invalid attachment type "{type(attachment)}"`)
+	end
+
+	for key, nestedAttachment in attachment do
+		if type(key) ~= "number" then
+			error(`Invalid attachment key "{tostring(key)}"`)
+		end
+
+		appendAttach(targetProps, nestedAttachment)
+	end
+end
+
 -- 내부: 아이콘 생성
-local function createIcon(props: { [any]: any }): GuiBase2d?
+local function createIcon(props: { [any]: any }, getTheme: ThemeAccessor): GuiBase2d?
 	local iconContent = props.IconContent :: (Content | (() -> Content))?
 	if iconContent == nil then
 		return nil
@@ -123,7 +132,7 @@ local function createIcon(props: { [any]: any }): GuiBase2d?
 			return read(iconContent) or EMPTY_CONTENT
 		end,
 		ImageColor3 = function()
-			return read(iconColor) or theme().ButtonIcon
+			return read(iconColor) or getTheme().ButtonIcon
 		end,
 		LayoutOrder = 100,
 		ScaleType = Enum.ScaleType.Fit,
@@ -131,7 +140,7 @@ local function createIcon(props: { [any]: any }): GuiBase2d?
 end
 
 -- 내부: 텍스트 생성
-local function createText(props: { [any]: any }): GuiBase2d?
+local function createText(props: { [any]: any }, getTheme: ThemeAccessor): GuiBase2d?
 	local text = props.Text :: Prop<string>?
 	if text == nil then
 		return nil
@@ -144,7 +153,7 @@ local function createText(props: { [any]: any }): GuiBase2d?
 			return read(text) or ""
 		end,
 		TextColor3 = function()
-			return read(props.TextColor3) or theme().ButtonText
+			return read(props.TextColor3) or getTheme().ButtonText
 		end,
 		TextSize = props.TextSize or 14,
 		TextScaled = props.TextScaled,
@@ -158,82 +167,94 @@ local function createText(props: { [any]: any }): GuiBase2d?
 end
 
 local function Button(props: ButtonProps): GuiBase2d
-	local owned, forward, children = Props.extract(props :: any, OWNED_KEY_SET)
-
-	local _, setIsHighlight = signal(false)
+	local ownProps, forwardProps, children = Props.splitProps(props :: any, OWN_PROPS_SCHEMA)
+	local area = reactive.useContext(Area) :: Area.AreaValue
+	local themeContext = reactive.useContext(Theme)
+	local getTheme = themeContext.Get
 
 	-- 색상 getter
 	local function getButtonColor(): Color3
-		return read(owned.ButtonColor) or theme().Button
+		return read(ownProps.ButtonColor) or getTheme().Button
 	end
 	local function getHighlightColor(): Color3
-		return read(owned.HighlightColor) or theme().ButtonHighlight
+		return read(ownProps.HighlightColor) or getTheme().ButtonHighlight
 	end
 	local function getClickEffectColor(): Color3
-		return read(owned.ClickEffectColor) or theme().ButtonClickEffect
+		return read(ownProps.ClickEffectColor) or getTheme().ButtonClickEffect
 	end
 
-	-- Behaviors 조합
-	local autoScale = if owned.AutoScaleEnabled == nil then true else owned.AutoScaleEnabled
-	local interactiveChildren: { any } = {}
+	-- attachment 조합
+	local autoScaleValue = read(ownProps.AutoScaleEnabled) :: boolean?
+	local autoScale = if autoScaleValue == nil then true else autoScaleValue
+	local buttonProps: { [any]: any } = table.clone(forwardProps)
+	local userAttach = buttonProps.Attach
+	buttonProps.Attach = nil
 
-	-- Highlight
-	interactiveChildren[#interactiveChildren + 1] = Highlight({
-		NormalColor = getButtonColor,
-		HighlightColor = getHighlightColor,
-		Duration = 0.1,
-	})
+	appendAttach(
+		buttonProps,
+		Highlight({
+			NormalColor = getButtonColor,
+			HighlightColor = getHighlightColor,
+			Duration = 0.1,
+		})
+	)
 
-	-- PressScale
 	if autoScale then
-		interactiveChildren[#interactiveChildren + 1] = PressScale({
-			DefaultScale = 1,
-			HoverScale = 1.05,
-			PressedScale = 0.95,
-			Duration = 0.2,
-		})
+		appendAttach(
+			buttonProps,
+			PressScale({
+				DefaultScale = 1,
+				HoverScale = 1.05,
+				PressedScale = 0.95,
+				Duration = 0.2,
+			})
+		)
 	end
 
-	-- Ripple
-	interactiveChildren[#interactiveChildren + 1] = Ripple({
-		Color = getClickEffectColor,
-		ImageContent = function()
-			return read(owned.ClickEffectImageContent) or theme().ButtonClickEffectImageContent
-		end,
-		ResolutionScale = function()
-			return area().ResolutionScale :: number
-		end,
-	})
-
-	-- Clickable
-	interactiveChildren[#interactiveChildren + 1] = Clickable({
-		OnClick = owned.OnClick,
-		OnMouseButton1Click = owned.OnMouseButton1Click,
-		OnMouseButton2Click = owned.OnMouseButton2Click,
-		OnMouseButton3Click = owned.OnMouseButton3Click,
-		OnTouch = owned.OnTouch,
-		OnEnter = owned.OnEnter,
-		OnLeave = owned.OnLeave,
-		OnHoverBegin = function()
-			setIsHighlight(true)
-		end,
-		OnHoverEnd = function()
-			setIsHighlight(false)
-		end,
-		UserInputManager = area().UserInputManager,
-	})
-
-	-- Tooltip
-	if owned.TooltipText then
-		interactiveChildren[#interactiveChildren + 1] = Tooltip({
-			Text = owned.TooltipText,
+	appendAttach(
+		buttonProps,
+		Ripple({
+			Color = getClickEffectColor,
+			ImageContent = function()
+				return read(ownProps.ClickEffectImageContent)
+					or getTheme().ButtonClickEffectImageContent
+			end,
+			DisplayScale = function()
+				return getTheme().DisplayScale :: number
+			end,
 		})
+	)
+
+	appendAttach(
+		buttonProps,
+		Clickable({
+			OnClick = read(ownProps.OnClick),
+			OnMouseButton1Click = read(ownProps.OnMouseButton1Click),
+			OnMouseButton2Click = read(ownProps.OnMouseButton2Click),
+			OnMouseButton3Click = read(ownProps.OnMouseButton3Click),
+			OnTouch = read(ownProps.OnTouch),
+			OnEnter = read(ownProps.OnEnter),
+			OnLeave = read(ownProps.OnLeave),
+			UserInputManager = area.UserInputManager,
+		})
+	)
+
+	if ownProps.TooltipText ~= nil then
+		appendAttach(
+			buttonProps,
+			Tooltip({
+				Text = ownProps.TooltipText,
+			})
+		)
 	end
+
+	appendAttach(buttonProps, userAttach)
 
 	-- 내부 콘텐츠 (Icon + Text + Layout)
-	local iconElement = createIcon(owned)
-	local textElement = createText(owned)
+	local iconElement = createIcon(ownProps, getTheme)
+	local textElement = createText(ownProps, getTheme)
 	local hasContent = iconElement or textElement
+	local buttonChildren: { any } = {}
 
 	if hasContent then
 		local contentChildren: { any } = {}
@@ -261,22 +282,27 @@ local function Button(props: ButtonProps): GuiBase2d
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
 		}
-		Props.appendChildren(contentProps, contentChildren)
-		interactiveChildren[#interactiveChildren + 1] = create "Frame"(contentProps)
+		if #contentChildren > 0 then
+			table.move(contentChildren, 1, #contentChildren, #contentProps + 1, contentProps)
+		end
+		buttonChildren[#buttonChildren + 1] = create "Frame"(contentProps)
 	end
 
-	-- 사용자 children 추가
-	Props.appendChildren(interactiveChildren, children)
-
-	-- Interactive props 조립
-	local interactiveProps: { [any]: any } = table.clone(forward)
-	interactiveProps.BackgroundColor3 = getButtonColor
-	if interactiveProps.Size == nil then
-		interactiveProps.Size = UDim2.fromScale(1, 1)
+	if #children > 0 then
+		table.move(children, 1, #children, #buttonChildren + 1, buttonChildren)
 	end
-	Props.appendChildren(interactiveProps, interactiveChildren)
 
-	return Interactive(interactiveProps :: any)
+	buttonProps.Class = "ImageButton"
+	buttonProps.BackgroundColor3 = getButtonColor
+	buttonProps.CornerRadius = ownProps.CornerRadius
+	if buttonProps.Size == nil then
+		buttonProps.Size = UDim2.fromScale(1, 1)
+	end
+	if #buttonChildren > 0 then
+		table.move(buttonChildren, 1, #buttonChildren, #buttonProps + 1, buttonProps)
+	end
+
+	return Frame(buttonProps :: any)
 end
 
 return Button

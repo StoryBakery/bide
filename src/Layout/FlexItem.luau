@@ -2,13 +2,9 @@
     @class UIFlexItemWrapper
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
 
-local Props = require("../Utils/Props")
-
-local create = vide.create
-
-local EMPTY_KEY_SET = {}
+local create = Instance.create
 
 export type FlexItemProps = {
 	FlexMode: Enum.UIFlexMode?,
@@ -18,8 +14,7 @@ export type FlexItemProps = {
 }
 
 local function FlexItem(props: FlexItemProps)
-	local _, restProps = Props.splitProps(props :: any, EMPTY_KEY_SET)
-	return create "UIFlexItem"(Props.composeProps({}, restProps :: any, props :: any))
+	return create "UIFlexItem"(props :: any)
 end
 
 return FlexItem

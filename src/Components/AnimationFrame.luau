@@ -6,31 +6,32 @@
 
 local RunService = game:GetService("RunService")
 
-local vide = require("../vide")
+local reactive = require("../Reactive")
+local TableUtil = require("../../roblox_packages/TableUtil")
 
 local ImageLabel = require("./ImageLabel")
 local Props = require("../Utils/Props")
 
-local effect = vide.effect
-local memo = vide.memo
-local signal = vide.signal
-local onCleanup = vide.onCleanup
-local read = vide.read
+local effect = reactive.effect
+local memo = reactive.memo
+local signal = reactive.signal
+local cleanup = reactive.cleanup
+local read = reactive.read
 
-local PROP_SCHEMA = {
-	ImageContents = Props.required<<{ Content }>>(),
-	Frame = Props.optional<<number>>(),
+local OWN_PROPS_SCHEMA = {
+	Frames = Props.required<<{ Content }>>(),
+	FrameIndex = Props.optional<<number>>(),
 	AutoPlay = Props.optional<<boolean>>(),
-	Fps = Props.optional<<number>>(),
+	FrameRate = Props.optional<<number>>(),
 }
 
-type AnimationFrameLocalProps = typeof(PROP_SCHEMA)
+export type AnimationFrameOwnProps = typeof(OWN_PROPS_SCHEMA)
 
-export type AnimationFrameProps = AnimationFrameLocalProps & ImageLabel.ImageLabelProps
+export type AnimationFrameProps = AnimationFrameOwnProps & ImageLabel.ImageLabelProps
 
-local function getInitialFrame(frameValue: number?, totalFrames: number): number
-	if frameValue ~= nil and totalFrames > 0 then
-		return math.clamp(frameValue, 1, totalFrames)
+local function getInitialFrameIndex(frameIndexValue: number?, totalFrames: number): number
+	if frameIndexValue ~= nil and totalFrames > 0 then
+		return math.clamp(frameIndexValue, 1, totalFrames)
 	end
 
 	if totalFrames > 0 then
@@ -41,25 +42,25 @@ local function getInitialFrame(frameValue: number?, totalFrames: number): number
 end
 
 local function AnimationFrame(props: AnimationFrameProps)
-	local localProps, otherProps = Props.splitProps(props, PROP_SCHEMA)
-	local imageContentsProp = localProps.ImageContents
-	local frameProp = localProps.Frame
-	local autoPlayProp = localProps.AutoPlay
-	local fpsProp = localProps.Fps
+	local ownProps, otherProps, children = Props.splitProps(props, OWN_PROPS_SCHEMA)
+	local framesProp = ownProps.Frames
+	local frameIndexProp = ownProps.FrameIndex
+	local autoPlayProp = ownProps.AutoPlay
+	local frameRateProp = ownProps.FrameRate
 
 	local totalFrames = memo(function()
-		return #(read(imageContentsProp) or {})
+		return #(read(framesProp) or {})
 	end)
 
 	local currentFrameIndex, setCurrentFrameIndex =
-		signal(getInitialFrame(read(frameProp), totalFrames()))
+		signal(getInitialFrameIndex(read(frameIndexProp), totalFrames()))
 
 	effect(function()
 		local total = totalFrames()
-		local frame = read(frameProp) or 1
+		local frameIndex = read(frameIndexProp) or 1
 
 		if total > 0 then
-			setCurrentFrameIndex(math.clamp(frame, 1, total))
+			setCurrentFrameIndex(math.clamp(frameIndex, 1, total))
 		else
 			setCurrentFrameIndex(0)
 		end
@@ -70,38 +71,34 @@ local function AnimationFrame(props: AnimationFrameProps)
 	effect(function()
 		local total = totalFrames()
 		local autoPlay = read(autoPlayProp)
-		local frame = read(frameProp)
+		local frameIndex = read(frameIndexProp)
 
-		if autoPlay and frame == nil and total > 0 then
-			local fps = read(fpsProp) or 16
-			if fps <= 0 then
-				fps = 16
+		if autoPlay and frameIndex == nil and total > 0 then
+			local frameRate = read(frameRateProp) or 16
+			if frameRate <= 0 then
+				frameRate = 16
 			end
 
-			local frameDuration = 1 / fps
+			local frameDuration = 1 / frameRate
 			local accumulatedTime = 0
-
-			local frameForAutoplay = currentFrameIndex()
-			if frameForAutoplay == 0 or frameForAutoplay > total then
-				frameForAutoplay = 1
-				setCurrentFrameIndex(1)
-			end
 
 			local conn = RunService.RenderStepped:Connect(function(dt: number)
 				accumulatedTime = accumulatedTime + dt
 				if accumulatedTime >= frameDuration then
 					accumulatedTime = accumulatedTime - frameDuration
 
-					local prev = currentFrameIndex()
-					local nextFrame = prev + 1
-					if nextFrame > total then
-						nextFrame = 1
-					end
-					setCurrentFrameIndex(nextFrame)
+					setCurrentFrameIndex(function(previousFrameIndex)
+						local nextFrameIndex = previousFrameIndex + 1
+						if nextFrameIndex > total then
+							return 1
+						end
+
+						return nextFrameIndex
+					end)
 				end
 			end)
 
-			onCleanup(conn)
+			cleanup(conn)
 		end
 
 		return nil
@@ -113,13 +110,19 @@ local function AnimationFrame(props: AnimationFrameProps)
 			if total <= 0 then
 				return nil
 			end
+
 			local index = math.clamp(currentFrameIndex(), 1, total)
-			local imageContents = (read(imageContentsProp) :: { Content }?) or {}
-			return imageContents[index]
+			local frames = read(framesProp) or {}
+			return frames[index]
 		end,
 	}
 
-	return ImageLabel(Props.composeProps(base, otherProps :: any, nil))
+	local imageLabelProps = TableUtil.merge(base, otherProps)
+	if #children > 0 then
+		table.move(children, 1, #children, #imageLabelProps + 1, imageLabelProps)
+	end
+
+	return ImageLabel(imageLabelProps)
 end
 
 return AnimationFrame

@@ -4,49 +4,54 @@
 	테마 기본값이 적용된 ImageLabel 래퍼입니다.
 ]=]
 
-local vide = require("../vide")
+local TableUtil = require("../../roblox_packages/TableUtil")
+local reactive = require("../Reactive")
 
-local Element = require("../Core/Element")
+local Frame = require("./Frame")
 local Props = require("../Utils/Props")
 
-local read = vide.read
+local read = reactive.read
 
 type Prop<T> = T | (() -> T)
 
-export type ImageLabelProps = {
-	ImageContent: Prop<Content>?,
-	ImageColor3: Prop<Color3>?,
-	ImageTransparency: Prop<number>?,
-	ScaleType: Prop<Enum.ScaleType>?,
+local OWN_PROPS_SCHEMA = {
+	ImageContent = Props.optional<<Content>>(),
+	ImageColor3 = Props.optional<<Color3>>(),
 }
 
-local OWNED_KEY_SET = Props.keySet({
-	"ImageContent",
-	"ImageColor3",
-})
+export type ImageLabelOwnProps = typeof(OWN_PROPS_SCHEMA)
+
+type ImageLabelBaseProps = {
+	ImageTransparency: Prop<number>?,
+	ScaleType: Prop<Enum.ScaleType>?,
+} & Frame.FrameProps
+
+export type ImageLabelProps = ImageLabelOwnProps & ImageLabelBaseProps
 
 local EMPTY_CONTENT = Content.fromUri("")
 
 local function ImageLabel(props: ImageLabelProps): GuiBase2d
-	local owned, forward, children = Props.extract(props :: any, OWNED_KEY_SET)
+	local ownProps, forwardProps, children = Props.splitProps(props :: any, OWN_PROPS_SCHEMA)
 
 	local base = {
 		Class = "ImageLabel",
 		BackgroundTransparency = 1,
 		ImageContent = function()
-			return read(owned.ImageContent) or EMPTY_CONTENT
+			return read(ownProps.ImageContent) or EMPTY_CONTENT
 		end,
 		ImageColor3 = function()
-			return read(owned.ImageColor3) or Color3.new(1, 1, 1)
+			return read(ownProps.ImageColor3) or Color3.new(1, 1, 1)
 		end,
 		StrokeEnabled = false,
 		ScaleType = Enum.ScaleType.Fit,
 	}
 
-	local elementProps = Props.merge(base, forward)
-	Props.appendChildren(elementProps, children)
+	local elementProps = TableUtil.merge(base, forwardProps)
+	if #children > 0 then
+		table.move(children, 1, #children, #elementProps + 1, elementProps)
+	end
 
-	return Element(elementProps :: any)
+	return Frame(elementProps :: any)
 end
 
 return ImageLabel

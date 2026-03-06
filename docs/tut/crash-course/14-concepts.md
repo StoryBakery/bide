@@ -1,75 +1,69 @@
-# Concepts Summary
+---
+title: Concepts Summary
+---
 
-A summary of all the concepts covered during the crash course.
+A short summary of the reactive concepts used throughout the crash course.
 
-## Source
+## Signal
 
-A source of data.
+A signal is a pair of functions:
 
-Stores a single value that can be updated.
+- an accessor that reads the current value,
+- and a setter that writes the next value.
 
-Created with `source()`.
+## Derived Value
 
-## Derived Source
+A derived value is computed from one or more signals.
 
-A new source composed of other sources.
-
-Created with a plain function or with `derive()`.
+- Use a plain function for cheap one-off reads.
+- Use `memo()` when the derived result should be cached.
 
 ## Effect
 
-Anything that happens in response to a source update.
-
-Created with `effect()`.
+An effect is a reactive scope that reruns when its tracked signal reads change.
 
 ## Stable Scope
 
-One of the two types of Vide scopes.
+Stable scopes do not rerun.
 
-Created by:
+They are created by APIs such as:
 
-- `root()`
-- `untrack()`
-- `show()`
-- `indexes()`
-  
-Stable scopes do not track sources and never rerun.
-
-New stable or reactive scopes can be created within a stable scope.
+- `root()`,
+- `show()`,
+- `switch()`,
+- `indexes()`,
+- `values()`,
+- `Provider()` from `createContext()`.
 
 ## Reactive Scope
 
-Created by:
+Reactive scopes do rerun.
 
-- `effect()`
-- `derive()`
+They are created by:
 
-Reactive scopes do track sources and will rerun when those sources update.
+- `effect()`,
+- `memo()`.
 
-Reactive scopes cannot be created within a reactive scope, but stable scopes
-can be created within a reactive scope.
+Reactive scopes own any child scopes created during their evaluation.
 
 ## Scope Cleanup
 
-When a scope is rerun or destroyed, all scopes created within it are
-automatically destroyed.
+When a scope reruns or is destroyed:
 
-Any functions queued by `cleanup()` are also ran.
+- child scopes created inside it are destroyed,
+- queued cleanup callbacks run,
+- and tracked dependencies are rebuilt on the next evaluation.
 
 ## Reactive Graph
 
-The combination of stable and reactive scopes can viewed graphically, called a
-*reactive graph*. This can be a more intuitive way to think of the
-relationships between effects and the sources they depend on.
-
-### Code
+Signals, stable scopes, and reactive scopes form a graph.
 
 ```luau
-local count = source(0)
+local count, setCount = signal(0)
 
 root(function()
-    local text = derive(function()
-        return "count: " .. count()
+    local text = memo(function()
+        return `count: {count()}`
     end)
 
     effect(function()
@@ -78,36 +72,4 @@ root(function()
 end)
 ```
 
-### Graph resulting from code
-
-```mermaid
-%%{init: {
-    "theme": "base",
-    "themeVariables": {
-        "primaryColor": "#111720",
-        "primaryTextColor": "#fff",
-        "primaryBorderColor": "#111720",
-        "lineColor": "#79B8FF",
-        "tertiaryColor": "#0d131b",
-        "tertiaryBorderColor": "#202530"
-    }
-}}%%
-
-graph LR
-
-subgraph root
-    text --> effect
-end
-
-count --> text
-```
-
-Notes:
-
-- Since `count` is a source, not an effect, it can exist
-  outside of scopes.
-- An update to `count` will cause `text` to rerun, which
-  then causes `effect` to rerun.
-- When the root scope is destroyed, `text` and
-  `effect` will be destroyed alongside it, since they were created within it.
-  `count` will be untouched and future updates to `count` will have no effect.
+A `count` update reruns `text`, then reruns the `effect` that depends on it.

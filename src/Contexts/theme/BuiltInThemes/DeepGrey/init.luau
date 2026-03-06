@@ -3,6 +3,7 @@ return {
 	AreaOutline = Color3.fromRGB(78, 78, 84),
 
 	Header = Color3.fromRGB(58, 58, 62),
+	DisplayScale = 1,
 
 	Background = Color3.fromRGB(44, 44, 48),
 	Stroke = Color3.fromRGB(86, 86, 92),

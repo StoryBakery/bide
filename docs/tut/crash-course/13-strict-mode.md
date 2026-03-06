@@ -1,16 +1,26 @@
-# Strict Mode
+---
+title: Strict Mode
+---
 
-While developing UI with Vide, you should use Vide's strict mode, which can
-be set with `vide.strict = true` once when you first require Vide. Strict mode
-will add extra safety checks and emit better error traces, particularly when
-errors occur in property bindings.
+Enable strict mode during development to catch invalid reactive usage early.
 
-By default, strict mode is disabled. You can turn it on once when Vide is
-required.
+## Enable strict mode
 
 ```luau
-vide.strict = true
+reactive.strict = true
 ```
 
-A full list of what strict mode will do can be found
-[here](../../api/strict-mode).
+Strict mode is disabled by default.
+
+## Why use it
+
+Strict mode adds validation and clearer stack traces for:
+
+- yields inside reactive code,
+- duplicate values passed to `values()`,
+- duplicate nested property writes,
+- invalid scope destruction,
+- and effect error traces.
+
+Keep it on while iterating, then decide per production path whether the extra
+checks are still worth the overhead.

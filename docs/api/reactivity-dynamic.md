@@ -1,229 +1,99 @@
-# Reactivity: Dynamic Scopes
+---
+title: Reactivity Dynamic
+---
 
-Dynamic scopes are scopes that are created or destroyed in response to
-source updates. Vide provides functions for some common use-cases for dynamic scopes.
+Dynamic helpers create and destroy stable sub-scopes in response to signal
+updates.
 
-## show() <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>
+## show()
 
-Shows a component if the source is truthy. Optionally shows a fallback component
-if the source is falsey.
+Shows a component while the input accessor is truthy.
 
-- **Type**
+- Type
 
-    ```luau
-    function show<T>(source: () -> unknown, component: Constructor<T>): () -> T?
-    function show<T, U>(source: () -> unknown, component: Constructor<T>, fallback: () -> U): () -> T | U
+  ```luau
+  type SignalAccessor<T> = () -> T
+  type ShowComponent<TInput, TObject> = (
+      SignalAccessor<TInput>,
+      SignalAccessor<boolean>
+  ) -> (TObject, ...number)
+  type ShowFallback<TObject> = (SignalAccessor<boolean>) -> (TObject, ...number)
 
-    type Constructor<T> = () -> (T, number?)
-    ```
+  function show<TInput, TObject>(
+      input: SignalAccessor<TInput?>,
+      component: ShowComponent<TInput, TObject>,
+      fallback: ShowFallback<TObject>?
+  ): SignalAccessor<TObject | { TObject } | nil>
+  ```
 
-- **Details**
+- Details
 
-    Creates a reactive scope internally to detect source updates.
+  - `show()` keeps the last truthy input value available to the component.
+  - The second accessor, usually named `present`, flips to `false` immediately
+    when the branch starts leaving.
+  - Returning a number after the object delays scope destruction.
 
-    The component is run in a stable scope when truthy, otherwise the stable
-    scope is destroyed.
+## switch()
 
-    Returns a source holding an instance of the currently shown component or
-    `nil` if no component is currently shown.
+Chooses one branch from a mapping table.
 
-    Destruction of the scope can be delayed by returning the number of seconds
-    to delay by, after the component.
+- Type
 
-## switch() <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>
+  ```luau
+  type SwitchComponent<TObject> = (SignalAccessor<boolean>) -> (TObject, ...number)
 
-Shows one of a set of components depending on a source and a mapping table.
+  function switch<K, TObject>(
+      input: SignalAccessor<K>
+  ): (map: { [K]: SwitchComponent<TObject> }) -> SignalAccessor<TObject | { TObject } | nil>
+  ```
 
-- **Type**
+- Details
 
-    ```luau
-    function switch<K, V>(source: () -> K): (map: Map<K, Constructor<V>>): () -> V?
+  - Only the currently selected branch stays present.
+  - Returning a delay keeps the previous branch alive until the timer expires.
 
-    type Constructor<T> = () -> (T, number?)
-    ```
+## indexes()
 
-- **Details**
+Creates one stable sub-scope per input index.
 
-    Creates a reactive scope internally to detect source updates.
+- Type
 
-    When the source updates, its value is inputted into a map to get a component
-    constructor. This component is then run in a stable scope. The previous
-    stable scope is destroyed.
+  ```luau
+  function indexes<K, V, TObject>(
+      input: SignalAccessor<{ [K]: V }>,
+      component: (SignalAccessor<V>, K, SignalAccessor<boolean>) -> (TObject, ...number)
+  ): SignalAccessor<{ TObject }>
+  ```
 
-    Returns a source holding an instance of the currently shown component or
-    `nil` if no component is currently shown.
+- Details
 
-    Destruction of the scope can be delayed by returning the number of seconds
-    to delay by, after the component.
+  - A component is reused while the same index remains present.
+  - The first callback argument is a signal accessor for that index's current value.
+  - The third callback argument is the branch `present` accessor.
 
-- **Example**
+## values()
 
-    ```luau
-    local logged = source(false)
+Creates one stable sub-scope per input value.
 
-    local button = switch(logged) {
-        [true] = function()
-            return Button { Text = "Log out", Toggle = logged }
-        end,
+- Type
 
-        [false] = function()
-            return Button { Text = "Log in",  Toggle = logged }
-        end
-    }
-    ```
+  ```luau
+  function values<K, V, TObject>(
+      input: SignalAccessor<{ [K]: V }>,
+      component: (V, SignalAccessor<K>, SignalAccessor<boolean>) -> (TObject, ...number)
+  ): SignalAccessor<{ TObject }>
+  ```
 
-## indexes() <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>
+- Details
 
-Shows a component for each index in a table.
+  - A component is reused while the same value object remains present.
+  - The second callback argument is a signal accessor for that value's current index.
+  - Duplicate values are unsafe and should be avoided. `reactive.strict = true`
+    throws for this case.
 
-- **Type**
+## Choosing indexes() or values()
 
-    ```luau
-    function indexes<KI, VI, VO>(
-        source: () -> Map<KI, VI>,
-        constructor: (value: () -> VI, index: KI) -> (VO, number?)
-    ): Array<VO>
-    ```
-
-- **Details**
-
-    Creates a reactive scope internally to detect source updates.
-
-    When the source table updates, a component is generated for each index in
-    the table.
-
-    - For any added index, the `constructor` function is run in a new stable
-      scope to produce an instance that is cached.
-    - For any removed index, the stable scope for that index is destroyed.
-
-    The `constructor` function is called with:
-
-    1. A *source containing the index's value*.
-    2. The *index itself*.
-
-    Anytime an existing index's value changes, the `constructor` function is not
-    rerun, instead, that index's corresponding source is updated with the new
-    value.
-
-    Returns a source holding an array of instances currently shown.
-
-    Destruction of the scope can be delayed by returning the number of seconds
-    to delay by, after the component.
-
-- **Example**
-
-    ```luau
-    type Item = {
-        name: string,
-        icon: number
-    }
-
-    local items = source {} :: () -> Array<Item>
-
-    local displays = indexes(items, function(item, i)
-        return ItemDisplay {
-            Name = function()
-                return i .. ": " .. item().name
-            end,
-
-            Image = function()
-                return "rbxassetid://" .. item().icon
-            end,
-        }
-    end)
-    ```
-
-## values() <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>
-
-Shows a component for each value in a table.
-
-- **Type**
-
-    ```luau
-    function values<KI, VI, VO>(
-        source: () -> Map<KI, VI>,
-        constructor: (value: VI, index: () -> KI) -> (VO, number?)
-    ): Array<VO>
-
-- **Details**
-
-    Operates with the same idea as `indexes()`, but applied to values instead of
-    indexes.
-
-    Creates a reactive scope internally to detect source updates.
-
-    When the source table updates, a component is generated for each value in
-    the table.
-
-    - For any added value, the `constructor` function is run in a new stable scope
-      to produce an instance that is cached.
-    - For any removed value, the stable scope for that value is destroyed.
-  
-    The `constructor` function is called with:
-
-    1. The *value itself*.
-    2. A *source containing the value's index*.
-
-    Anytime an existing value's index changes, the `constructor` function is not
-    rerun, instead, that value's corresponding source is updated with the new
-    index.
-
-    Returns a source holding an array of instances currently shown.
-
-    Destruction of the scope can be delayed by returning the number of seconds
-    to delay by, after the component.
-
-    ::: warning
-    Having the same values appear multiple times in the input source table can
-    cause unexpected behavior. Strict mode has checks for this.
-    :::
-
-- **Example**
-
-    ```luau
-    type Item = {
-        name: string,
-        icon: number
-    }
-
-    local items = source {} :: () -> Array<Item>
-
-    local displays = values(items, function(item, i)
-        return ItemDisplay {
-            Name = function()
-                return i() .. ": " .. item.Name
-            end
-
-            Image = "rbxassetid://" .. item.icon,
-        }
-    end)
-    ```
-
-- **Extra**
-
-    When should you use `indexes()` and `values()`?
-
-    `values()` should be used when you have a fixed set of objects where the
-    same objects can be re-arranged in the source table. It maps a value to a
-    UI element.
-
-    e.g.
-    - List of all players.
-    - Inventory of items.
-    - Chat message history.
-    - Toast notifications.
-
-    `indexes()` should be used in other cases, especially when your source table
-    has primitive values. It maps an index to a UI element.
-
-    e.g.
-    - List of character or weapon stats.
-
-    In most cases, both functions will produce the same observed result.
-    The main difference is performance, picking the right function to use can
-    result in less property updates and less re-renders. One case to note is
-    that `values()` works nicely when animating re-ordering of instances, since
-    the source index can be used to animate a change in position for the UI
-    element.
-
---------------------------------------------------------------------------------
+- Use `indexes()` when index identity matters or the collection contains
+  primitive values.
+- Use `values()` when object identity matters and items may be reordered.
+- In both cases, set a new table reference when mutating the collection.

@@ -1,21 +1,23 @@
-# Introduction
+---
+title: Introduction
+---
 
-This is a tutorial that introduces the concepts and usage of Vide.
+This crash course introduces the reactive runtime and UI creation model used by
+bide.
 
-Vide is heavily inspired by [Solid](https://www.solidjs.com/).
+bide's reactive layer is heavily inspired by [Solid](https://www.solidjs.com/).
 
-## Why Vide?
+## Why bide?
 
-Vide's reactive and declarative API aims to let you program UI as simply as
-possible, with a strong focus on how data flows through your application.
+The library aims to keep UI code direct and data-oriented.
 
-Some of Vide's main design choices:
+Some of the main design choices are:
 
-- Syntax minimal.
-- Data oriented.
-- Typechecking compatible.
-- Instance independent.
+- minimal syntax,
+- explicit data flow,
+- predictable scope lifetime,
+- and compatibility with Luau typechecking.
 
-Vide's reactivity operates with the concept
-of scopes which carries a learning curve, though is what makes Vide's minimal
-syntax possible. The crash course will introduce these concepts gradually.
+The reactive model is built around scopes. That concept has a small learning
+curve, but it is what keeps the API compact while still allowing cleanup,
+derivation, and dynamic UI composition.

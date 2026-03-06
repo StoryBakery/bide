@@ -4,24 +4,29 @@
 	원형 진행 UI 를 렌더링하는 컴포넌트입니다.
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
+local TableUtil = require("../../roblox_packages/TableUtil")
+local reactive = require("../Reactive")
 
 local Frame = require("./Frame")
 local Gradient = require("../Layout/Gradient")
 local Props = require("../Utils/Props")
 
-local action = vide.action
-local create = vide.create
-local memo = vide.memo
-local onCleanup = vide.onCleanup
-local read = vide.read
+local create = Instance.create
+local memo = reactive.memo
+local read = reactive.read
 
 type Prop<T> = T | (() -> T)
 
-export type CircularFrameProps = {
-	StartProgress: Prop<number>?,
-	EndProgress: Prop<number>?,
-} & Frame.FrameProps
+local OWN_PROPS_SCHEMA = {
+	Class = Props.optional<<string>>(),
+	StartProgress = Props.optional<<number>>(),
+	EndProgress = Props.optional<<number>>(),
+}
+
+export type CircularFrameOwnProps = typeof(OWN_PROPS_SCHEMA)
+
+export type CircularFrameProps = CircularFrameOwnProps & Frame.FrameProps
 
 local OFFSET = 0.001
 
@@ -37,12 +42,6 @@ local REVERSED_TRANSPARENCY_SEQUENCE = NumberSequence.new({
 	NumberSequenceKeypoint.new(0.5 - OFFSET, 1),
 	NumberSequenceKeypoint.new(0.5, 0),
 	NumberSequenceKeypoint.new(1, 0),
-})
-
-local OWNED_KEY_SET = Props.keySet({
-	"Class",
-	"StartProgress",
-	"EndProgress",
 })
 
 type FollowedClone = {
@@ -143,11 +142,11 @@ local function createPropChildrenContainer(positionX: number, childFolder: Insta
 		Position = UDim2.fromScale(positionX, 0),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
+		Attach = function()
+			return followedFolder.Destroy
+		end,
 		clonedFolder,
 	}
-	props[#props + 1] = action(function()
-		onCleanup(followedFolder.Destroy)
-	end)
 
 	return create "Frame"(props :: any)
 end
@@ -247,15 +246,10 @@ local function computeAngles(startProgress: number, endProgress: number)
 end
 
 local function CircularFrame(props: CircularFrameProps)
-	local localProps, restProps = Props.splitProps(props, OWNED_KEY_SET)
+	local ownProps, forwardProps, propChildren = Props.splitProps(props, OWN_PROPS_SCHEMA)
 	local base = {
-		Class = localProps.Class or "CanvasGroup",
+		Class = (read(ownProps.Class) :: string?) or "CanvasGroup",
 	}
-
-	local propChildren = {}
-	for index = 1, #props do
-		propChildren[index] = props[index]
-	end
 
 	local childFolder = create "Frame" {
 		Name = "CircularFrameChildren",
@@ -266,7 +260,7 @@ local function CircularFrame(props: CircularFrameProps)
 	}
 
 	local function getStartProgress()
-		local value = read(localProps.StartProgress)
+		local value = read(ownProps.StartProgress)
 		if value == nil then
 			return 0
 		end
@@ -274,7 +268,7 @@ local function CircularFrame(props: CircularFrameProps)
 	end
 
 	local function getEndProgress()
-		local value = read(localProps.EndProgress)
+		local value = read(ownProps.EndProgress)
 		if value == nil then
 			return 1
 		end
@@ -291,10 +285,7 @@ local function CircularFrame(props: CircularFrameProps)
 		return anglesSignal()
 	end
 
-	local propsWithChildren = {}
-	for index = 1, #propChildren do
-		propsWithChildren[index] = propChildren[index]
-	end
+	local propsWithChildren = table.clone(propChildren)
 
 	propsWithChildren[#propsWithChildren + 1] = childFolder
 
@@ -380,7 +371,12 @@ local function CircularFrame(props: CircularFrameProps)
 		createPropChildrenContainer(0, childFolder),
 	}
 
-	return Frame(Props.composeProps(base, restProps, propsWithChildren))
+	local frameProps = TableUtil.merge(base, forwardProps)
+	if #propsWithChildren > 0 then
+		table.move(propsWithChildren, 1, #propsWithChildren, #frameProps + 1, frameProps)
+	end
+
+	return Frame(frameProps)
 end
 
 return CircularFrame

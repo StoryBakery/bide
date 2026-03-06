@@ -3,6 +3,7 @@ return {
 	AreaOutline = Color3.fromRGB(61, 61, 61),
 
 	Header = Color3.fromRGB(40, 40, 40),
+	DisplayScale = 1,
 
 	--#region Frame
 	Background = Color3.fromRGB(40, 40, 40),

@@ -5,7 +5,8 @@
 ]=]
 
 local DynamicTimer = require("../../roblox_packages/DynamicTimer")
-local vide = require("../vide")
+local Instance = require("../Instance")
+local reactive = require("../Reactive")
 
 local Props = require("../Utils/Props")
 
@@ -17,36 +18,28 @@ local TextLabel = require("./TextLabel")
 
 local StepButton = require("@self/StepButton")
 
-local create = vide.create
-local effect = vide.effect
-local signal = vide.signal
-local onCleanup = vide.onCleanup
-local read = vide.read
+local create = Instance.create
+local effect = reactive.effect
+local signal = reactive.signal
+local cleanup = reactive.cleanup
+local read = reactive.read
 
-export type PageStepperProps = {
+local OWN_PROPS_SCHEMA = {
+	CurrentPage = Props.required<<number>>(),
+	Pages = Props.required<<{ any }>>(),
+	PageTweenDuration = Props.optional<<number>>(),
+	OnChangingPage = Props.required<<((pageDelta: number) -> ())>>(),
+}
 
-	CurrentPage: number,
+export type PageStepperOwnProps = typeof(OWN_PROPS_SCHEMA)
 
-	Pages: { any },
-
-	PageTweenDuration: number?,
-
-	OnChangingPage: (pageDelta: number) -> (),
-} & Frame.FrameProps
-
-local OWNED_KEY_SET = Props.keySet({
-	"CurrentPage",
-	"Pages",
-	"PageTweenDuration",
-	"OnChangingPage",
-})
+export type PageStepperProps = PageStepperOwnProps & Frame.FrameProps
 
 local function PageStepper(props: PageStepperProps)
-	local ownedProps, forwardProps, children = Props.extract(props :: any, OWNED_KEY_SET)
-	local currentPage = read(ownedProps.CurrentPage)
-	local pages = read(ownedProps.Pages) :: { any }
-	local pageTweenDuration = read(ownedProps.PageTweenDuration)
-	local onChangingPage = ownedProps.OnChangingPage
+	local ownProps, forwardProps, children = Props.splitProps(props :: any, OWN_PROPS_SCHEMA)
+	local currentPage = read(ownProps.CurrentPage)
+	local pages = read(ownProps.Pages) :: { any }
+	local pageTweenDuration = read(ownProps.PageTweenDuration)
 
 	local scrollPos, setScrollPos = signal(0)
 	local scrollTween: DynamicTimer.DynamicTween?
@@ -68,7 +61,7 @@ local function PageStepper(props: PageStepperProps)
 		scrollTween = paddingTween
 	end)
 
-	onCleanup(function()
+	cleanup(function()
 		if scrollTween then
 			scrollTween:Destroy()
 		end
@@ -96,7 +89,7 @@ local function PageStepper(props: PageStepperProps)
 		scrollingFrameProps[index] = page
 	end
 
-	Props.appendChild(
+	table.insert(
 		scrollingFrameProps,
 		GridLayout {
 			CellSize = UDim2.fromScale(1 / #pages, 1),
@@ -130,6 +123,10 @@ local function PageStepper(props: PageStepperProps)
 		Position = UDim2.new(0, 5, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		OnClick = function()
+			local onChangingPage = read(ownProps.OnChangingPage) :: ((number) -> ())?
+			if onChangingPage == nil then
+				return
+			end
 			onChangingPage(-1)
 		end,
 	}) :: any)
@@ -139,6 +136,10 @@ local function PageStepper(props: PageStepperProps)
 		Position = UDim2.new(1, -5, 0.5, 0),
 		AnchorPoint = Vector2.new(1, 0.5),
 		OnClick = function()
+			local onChangingPage = read(ownProps.OnChangingPage) :: ((number) -> ())?
+			if onChangingPage == nil then
+				return
+			end
 			onChangingPage(1)
 		end,
 	}) :: any)
@@ -147,12 +148,14 @@ local function PageStepper(props: PageStepperProps)
 	for key, value in forwardProps do
 		frameProps[key] = value
 	end
-	Props.appendChildren(frameProps, children)
+	if #children > 0 then
+		table.move(children, 1, #children, #frameProps + 1, frameProps)
+	end
 
-	Props.appendChild(frameProps, leftStep)
-	Props.appendChild(frameProps, rightStep)
-	Props.appendChild(frameProps, TextLabel(pageDisplayProps :: any))
-	Props.appendChild(frameProps, pagesFolder)
+	table.insert(frameProps, leftStep)
+	table.insert(frameProps, rightStep)
+	table.insert(frameProps, TextLabel(pageDisplayProps :: any))
+	table.insert(frameProps, pagesFolder)
 
 	return Frame(frameProps :: any)
 end

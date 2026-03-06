@@ -1,55 +1,77 @@
-# Actions
+---
+title: Attachments
+---
 
-Actions are special callbacks that you can pass along with properties,
-to run some code on an instance receiving them.
+이전 `action()` workflow 대신 `Attach` prop을 사용합니다.
+
+## 기본 사용
+
+attachment는 인스턴스에 붙는 plain function입니다.
 
 ```luau
-local action = vide.action
+local bide = require("bide")
+
+local create = bide.Instance.create
 
 create "TextLabel" {
-    Text = "test",
-
-    action(function(instance)
-        print(instance.Text)
-    end)
+	Text = "test",
+	Attach = function(instance)
+		print(instance.Text)
+	end,
 }
-
--- will print "test"
 ```
 
-Actions can be wrapped with functions for reuse. Below is an example of an
-action used to listen for property changes:
+초기 mount가 끝난 뒤 attachment가 실행됩니다.
+
+## 여러 attachment 조합
+
+여러 개를 붙일 때는 `Attach` 배열을 사용합니다.
 
 ```luau
-local action = vide.action
-local source = vide.source
-local effect = vide.effect
-local cleanup = vide.cleanup
+local bide = require("bide")
 
-local function changed(property: string, callback: (new) -> ())
-    return action(function(instance)
-        local connection = instance:GetPropertyChangedSignal(property):Connect(function()
-            callback(instance[property])
-        end)
+local create = bide.Instance.create
+local Attachments = bide.Attachments
 
-        -- remember to clean up the connection when the reactive scope the action
-        -- is ran in is destroyed, so the instance can be garbage collected
-        cleanup(connection)
-    end)
-end
-
-local output = source ""
-
-local instance = create "TextBox" {
-    changed("Text", output)
+create "TextButton" {
+	Text = "Click",
+	Attach = {
+		Attachments.Clickable({
+			OnClick = function()
+				print("clicked")
+			end,
+		}),
+		Attachments.HoverDelay({
+			DelaySeconds = 0.2,
+			OnHover = function()
+				print("hover")
+			end,
+		}),
+	},
 }
-
-effect(function()
-    print(output())
-end)
-
-instance.Text = "foo" -- "foo" will be printed by the effect
 ```
 
-The source `output` will be updated with the new property value any time it is
-changed externally.
+순서는 배열 순서를 그대로 따릅니다.
+
+## Changed helper
+
+property 변경 구독은 `Attachments.Changed()`로 처리합니다.
+
+```luau
+local bide = require("bide")
+
+local create = bide.Instance.create
+local Attachments = bide.Attachments
+local output = ""
+
+create "TextBox" {
+	Text = "hello",
+	Attach = {
+		Attachments.Changed("Text", function(value)
+			output = value
+		end),
+	},
+}
+```
+
+이 helper는 connection cleanup까지 함께 처리합니다.

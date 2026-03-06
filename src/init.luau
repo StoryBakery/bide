@@ -6,34 +6,34 @@
 	local bide = require("bide")
 
 	bide.Components.Button({ Text = "확인", OnClick = fn })
-	bide.Core.Interactive({
-		bide.Behaviors.Highlight(), 
-		bide.Behaviors.Clickable({ OnClick = fn }) 
+	bide.Components.Frame({
+		Attach = {
+			bide.Attachments.Highlight(),
+			bide.Attachments.Clickable({ OnClick = fn }),
+		},
 	})
-	bide.Core.Element({ Class = "Frame", Size = ... })
+	bide.Components.Frame({ Size = ... })
 	```
 ]=]
 
-local vide = require("@self/vide")
-
-local Core = require("@self/Core")
-
-local Behaviors = require("@self/Behaviors")
+local Attachments = require("@self/Attachments")
 local Components = require("@self/Components")
+local Contexts = require("@self/Contexts")
 local Layout = require("@self/Layout")
 
-local Modifier = require("@self/Modifier")
+local Instance = require("@self/Instance")
+local Renderer = require("@self/Renderer")
 
 local Props = require("@self/Utils/Props")
 
 local bide = {
-	Core = Core,
-
-	Behaviors = Behaviors,
+	Attachments = Attachments,
 	Components = Components,
+	Contexts = Contexts,
 	Layout = Layout,
 
-	Modifier = Modifier,
+	Instance = Instance,
+	Renderer = Renderer,
 	Props = Props,
 }
 

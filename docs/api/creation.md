@@ -1,152 +1,102 @@
-# Element Creation
+---
+title: Element Creation
+---
+
+UI element creation API와 `Attach` workflow를 설명합니다.
 
 ## create()
 
-Creates a new UI element, applying any given properties.
+새 UI element를 만들고 props를 적용합니다.
 
-- **Type**
+- Type
 
-    ```luau
-    function create(class: string): (Properties) -> Instance
-    function create(instance: Instance): (Properties) -> Instance
+  ```luau
+  function create(class: string): (Properties) -> Instance
+  function create(instance: Instance): (Properties) -> Instance
 
-    type Properties = Map<string|number, unknown>
-    ```
+  type Properties = { [string | number]: unknown }
+  ```
 
-- **Details**
+- Details
 
-    The function can take either a `string` or an `Instance` as its first argument.
+  - 첫 번째 인자로 `string`을 받으면 같은 클래스의 새 인스턴스를 만듭니다.
+  - 첫 번째 인자로 `Instance`를 받으면 해당 인스턴스를 clone해서 사용합니다.
+  - 반환값은 props를 적용하는 두 번째 함수입니다.
 
-    - If given a `string`, a new instance with the same class name will be created.
-    - If given an `Instance`, a new instance that is a clone of the given instance
-    will be created.
+## create() property rules
 
-    This returns another function that is used to apply any properties to the new
-    instance.
+- string key
+  - `Attach`: attachment를 수집하고, 초기 mount가 끝난 뒤 순서대로 실행합니다.
+  - 함수 값: event면 연결하고, 일반 property면 reactive effect를 만듭니다.
+  - 그 외 값: property를 바로 설정합니다.
+- number key
+  - table: nested props로 재귀 처리합니다.
+  - 함수: reactive children accessor로 처리합니다.
+  - instance: child로 parent합니다.
 
-- **Property setting rules**
+## Attach
 
-    - **index is string:**
-      - **value is function:**
-        - **property is event:** connect function as callback
-        - **property is not event:** create effect to update property
-      - **value is not function:** set property to value
-    - **index is number:**
-      - **value is action:** run action
-      - **value is table:** recurse table
-      - **value is function:** create effect to update children
-      - **value is instance:** set instance as child
+`Attach`는 인스턴스에 동작을 부착하는 내장 prop입니다.
 
-- **Example**
+```luau
+local bide = require("bide")
 
-    Basic element creation.
+local create = bide.Instance.create
+local Attachments = bide.Attachments
 
-    ```luau
-    local frame = create "TextButton" {
-        Name = "Button",
-        Size = UDim2.fromOffset(200, 160),
+local frame = create "TextButton" {
+	Name = "Button",
+	Text = "Click",
+	Attach = {
+		Attachments.Clickable({
+			OnClick = function()
+				print("clicked")
+			end,
+		}),
+	},
+}
+```
 
-        Activated = function()
-            print "clicked"
-        end,
+attachment는 plain function입니다.
 
-        create "UICorner" {}
-    }
-    ```
+```luau
+type Attachment<T> = (instance: T) -> (() -> ())?
+```
 
-## action()
+## Changed
 
-Creates a special object that can be passed to `create()` to invoke custom
-actions on instances.
+[`Changed`](../../src/Attachments/Changed.luau)는 property 변경을 구독하는 attachment helper입니다.
 
-- **Type**
+```luau
+local bide = require("bide")
 
-    ```luau
-    function action((Instance) -> (), priority: number = 1): Action
-    ```
+local create = bide.Instance.create
+local Attachments = bide.Attachments
+local output = ""
 
-- **Details**
+create "TextBox" {
+	Text = "hello",
+	Attach = {
+		Attachments.Changed("Text", function(value)
+			output = value
+		end),
+	},
+}
+```
 
-    When passed to `create()`, the function is called with the instance being
-    created as the only argument. Actions take precedence over property and
-    child assignments.
+`Changed`는 즉시 한 번 실행되고, 이후 property가 바뀔 때마다 다시 실행됩니다.
 
-    A priority can be optionally specified to ensure certain actions run after
-    other actions. Lower priority values are ran first.
+## mount()
 
-- **Example**
+새 stable scope에서 컴포넌트를 실행하고, 결과를 target에 적용합니다.
 
-    An action to listen to changed properties:
+- Type
 
-    ```luau
-    local function changed(property: string, fn: (new) -> ())
-        return action(function(instance)
-            local cn = instance:GetPropertyChangedSignal(property):Connect(function()
-                fn(instance[property])
-            end)
+  ```luau
+  function mount<T>(component: () -> T, target: Instance?): () -> ()
+  ```
 
-            -- disconnect on scope destruction to allow gc of instance
-            cleanup(function()
-                cn:Disconnect()
-            end)
-        end)
-    end
+- Details
 
-    local output = source ""
-
-    create "TextBox" {
-        -- will update the output source anytime the text property is changed
-        changed("Text", output)
-    }
-    ```
-
-## changed()
-
-A wrapper for `action()` to listen for property changes.
-
-- **Type**
-
-    ```luau
-    function changed(property: string, fn: (unknown) -> ()): Action
-    ```
-
-- **Details**
-
-    Will run the given function immediately and whenever the property updates.
-
-    The function is called with the updated property value.
-
-    Runs with an action priority of 1.
-
-## mount() <Badge type="info" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">STABLE</a></Badge>
-
-Runs a function in a new stable scope and optionally applies its result to a
-target instance.
-
-- **Type**
-  
-    ```luau
-    function mount<T>(component: () -> T, target: Instance?): () -> ()
-    ```
-
-- **Details**
-
-    This is a utility for `root()` when parenting a component to an existing
-    instance.
-
-    The result of the function is applied to a target in the same way
-    properties are using `create()`.
-
-    Returns a function that when called will destroy the stable scope.
-
-- **Example**
-
-    ```luau
-    local function App()
-        return create "ScreenGui" {
-            create "TextLabel" { Text = "Vide" }
-        }
-    end
-
-    local destroy = mount(App, game.StarterGui)
-    ```
+  - `root()`의 UI mount용 유틸리티입니다.
+  - 반환된 destroy 함수를 호출하면 stable scope를 정리합니다.

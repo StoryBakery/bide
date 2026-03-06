@@ -4,10 +4,11 @@
 	UIPadding 래퍼입니다.
 ]=]
 
-local vide = require("../vide")
+local reactive = require("../Reactive")
+local Instance = require("../Instance")
 
-local create = vide.create
-local read = vide.read
+local create = Instance.create
+local read = reactive.read
 
 type Prop<T> = T | (() -> T)
 

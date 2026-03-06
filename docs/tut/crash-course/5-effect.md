@@ -1,71 +1,60 @@
-# Effects
+---
+title: Effects
+---
 
-Effects are functions that are ran in response to source updates.
-A source and effect is analogous to a signal and connection.
+Effects rerun when the signals they read update.
 
-Effects are created using `effect()`.
+## Create an effect
+
+`effect()` must be created inside a stable scope.
 
 ```luau
-local source = vide.source
-local effect = vide.effect
+local count, setCount = signal(0)
 
-local count = source(0)
+root(function()
+    effect(function()
+        print(`count: {count()}`)
+    end)
 
-effect(function()
-    print("count: " .. count())
+    setCount(1)
 end)
-
--- "count: 0" printed
-count(1)
--- "count: 1" printed
 ```
 
-Any source read inside an effect is tracked and will rerun the effect when
-that source is updated.
+Any signal accessor read inside the callback becomes a dependency.
 
-The effect runs its callback once immediately to initially figure out what
-sources are being read.
+## Track derived reads
 
-Derived sources are also tracked, it does not matter how deeply nested
-inside a function a source is.
+Nested reads are tracked too.
 
 ```luau
-local source = vide.source
-local effect = vide.effect
-
-local count = source(1)
+local count, setCount = signal(1)
 
 local doubled = function()
     return count() * 2
 end
 
-effect(function()
-    print("doubled count: " .. doubled())
-end)
+root(function()
+    effect(function()
+        print(`doubled count: {doubled()}`)
+    end)
 
--- "doubled count: 2" printed
-count(2)
--- "doubled count: 4" printed
+    setCount(2)
+end)
 ```
 
-If a source is updated with the same value it already had, it will not rerun
-effects depending on it.
-
-You can also read from a source within an effect without the effect tracking it.
+## Skip tracking with untrack()
 
 ```luau
-local source = vide.source
-local effect = vide.effect
-local untrack = vide.untrack
+local a, setA = signal(0)
+local b, setB = signal(0)
 
-local a = source(0)
-local b = source(0)
+root(function()
+    effect(function()
+        print(`a: {a()} b: {untrack(b)}`)
+    end)
 
-effect(function()
-    print(`a: {a()} b: {untrack(b)}`)
+    setA(1) -- reruns
+    setB(1) -- does not rerun
+    setA(2) -- reruns
 end)
-
-a(1) -- prints "a: 1 b: 0"
-b(1) -- prints nothing
-a(2) -- prints "a: 2 b: 1"
 ```

@@ -1,12 +1,13 @@
 local RunService = game:GetService("RunService")
 
-local vide = require("../../../src/vide")
+local reactive = require("../../../src/Reactive")
+local Renderer = require("../../../src/Renderer")
 
 local Components = require("../../../src/Components")
 
-local effect = vide.effect
-local mount = vide.mount
-local source = vide.source
+local effect = reactive.effect
+local mount = Renderer.mount
+local source = reactive.source
 
 local function BeatButton()
 	local beat = source(0)
@@ -18,7 +19,7 @@ local function BeatButton()
 			beat((math.sin(time) + 1) / 2)
 		end)
 
-		vide.cleanup(conn)
+		reactive.cleanup(conn)
 		return nil
 	end)
 

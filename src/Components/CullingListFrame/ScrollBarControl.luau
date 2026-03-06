@@ -7,15 +7,14 @@
 local RunService = game:GetService("RunService")
 
 local LinearInterpolation = require("../../../roblox_packages/LinearInterpolation") :: any
-local vide = require("../../vide")
+local reactive = require("../../Reactive")
 
 local Button = require("../Button")
 local Frame = require("../Frame")
-local theme = require("../../Contexts/Theme")
 
-local effect = vide.effect
-local signal = vide.signal
-local onCleanup = vide.onCleanup
+local effect = reactive.effect
+local signal = reactive.signal
+local cleanup = reactive.cleanup
 
 local scrollBarSmoothers = {} :: { [any]: (dt: number) -> () }
 local scrollBarSmootherConn: RBXScriptConnection?
@@ -155,12 +154,12 @@ local function createScrollBarControl(config: ScrollBarConfig): ScrollBarHandle
 			end)
 		end)
 
-		onCleanup(function()
+		cleanup(function()
 			removeScrollBarSmoother(scrollBarSmootherToken)
 		end)
 	end)
 
-	local scrollBarElement = vide.show(config.GetScrollBarVisible, function()
+	local scrollBarElement = reactive.show(config.GetScrollBarVisible, function()
 		local function getScrollBarPositionUDim2()
 			local scrollBarPosition = config.GetScrollBarPosition()
 			if not config.GetReversesAlignment() then

@@ -4,9 +4,9 @@
 	CullingListFrame의 요소 정렬/키/팩토리 해결 유틸리티입니다.
 ]=]
 
-local vide = require("../../vide")
+local reactive = require("../../Reactive")
 
-local read = vide.read
+local read = reactive.read
 
 type ElementFactory = () -> GuiObject
 type ElementLike = GuiObject | ElementFactory

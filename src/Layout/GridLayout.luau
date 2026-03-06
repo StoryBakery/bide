@@ -2,13 +2,9 @@
     @class UIGridLayoutWrapper
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
 
-local Props = require("../Utils/Props")
-
-local create = vide.create
-
-local EMPTY_KEY_SET = {}
+local create = Instance.create
 
 export type GridLayoutProps = {
 	SortOrder: Enum.SortOrder?,
@@ -26,8 +22,7 @@ export type GridLayoutProps = {
 }
 
 local function UIGridLayout(props: GridLayoutProps)
-	local _, restProps = Props.splitProps(props :: any, EMPTY_KEY_SET)
-	return create "UIGridLayout"(Props.composeProps({}, restProps :: any, props :: any))
+	return create "UIGridLayout"(props :: any)
 end
 
 return UIGridLayout

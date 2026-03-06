@@ -10,16 +10,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install Luau zip
-        uses: robinraju/release-downloader@v1.9
-        with: 
-          repository: Roblox/luau
-          tag: "0.679"
-          fileName: luau-ubuntu.zip
-          out-file-path: bin
-
-      - name: Unzip Luau
-        run: unzip bin/luau-ubuntu.zip -d bin
+      - name: setup rokit
+        uses: CompeyDev/setup-rokit@v0.1.2
 
       - name: Run unit tests
-        run: bin/luau tests/vide-test/tests.luau
+        run: lune run tests/reactive-test/tests.luau

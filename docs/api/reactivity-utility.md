@@ -1,158 +1,162 @@
-# Reactivity: Utility
+---
+title: Reactivity Utility
+---
+
+Utility APIs that sit on top of the core reactive graph.
 
 ## cleanup()
 
-Queues a callback to run when a scope is reran or destroyed.
+Queues cleanup work for the current scope.
 
-- **Type**
+- Type
 
-    ```luau
-    function cleanup(v: Function | Disconnectable | Destroyable | thread)
+  ```luau
+  function cleanup(value: (() -> ()) | thread | unknown)
+  ```
 
-    type Function = () -> ()
-    type Destroyable = { destroy: () -> () }
-    type Disconnectable = { disconnect: () -> () }
-    ```
+- Details
 
-- **Example**
+  - Functions are queued directly.
+  - Common cleanup objects such as connections, instances, and tables with
+    `destroy`/`disconnect` style methods are also supported.
+  - Cleanup callbacks run when the current reactive scope reruns or when the
+    owning scope is destroyed.
 
-    ```luau
-    local count = source(0)
+- Example
 
-    local destroy = root(function(dispose)
-        effect(function()
-            count()
+  ```luau
+  local count, setCount = signal(0)
 
-            cleanup(function()
-                print "cleaned"
-            end)
-        end)
-        return dispose
-    end)
+  local destroy = root(function(dispose)
+      effect(function()
+          local current = count()
 
-    -- nothing printed yet
-    count(1) -- prints "cleaned"
-    count(2) -- prints "cleaned"
-    destroy() -- prints "cleaned"
-    ```
+          cleanup(function()
+              print(`cleaned: {current}`)
+          end)
+      end)
 
-## untrack() <Badge type="info" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">STABLE</a></Badge>
+      return dispose
+  end)
 
-Runs a function in a new stable scope.
+  setCount(1)
+  setCount(2)
+  destroy()
+  ```
 
-- **Type**
+## untrack()
 
-    ```luau
-    function untrack<T>(source: () -> T): T
-    ```
+Reads signals without subscribing the current reactive scope.
 
-- **Details**
+- Type
 
-    Can be used inside a reactive scope to read from sources you do not want
-    tracked by the reactive scope.
+  ```luau
+  function untrack<T>(getter: () -> T): T
+  ```
 
-- **Example**
+- Example
 
-    ```luau
-    local a = source(0)
-    local b = source(0)
+  ```luau
+  local a, setA = signal(0)
+  local b, setB = signal(0)
 
-    local sum = derive(function()
-        return a() + untrack(b)
-    end)
+  root(function()
+      local sum = memo(function()
+          return a() + untrack(b)
+      end)
 
-    print(sum()) -- 0
-    b(1) -- untracked so reactive scope created by derive() does not rerun
-    print(sum()) -- 0
-    a(1) -- reactive scope created by derive() reruns
-    print(sum()) -- 2
-    ```
+      print(sum()) -- 0
+      setB(1)
+      print(sum()) -- 0
+      setA(1)
+      print(sum()) -- 2
+  end)
+  ```
 
 ## read()
 
-Utility used to read a value that is either a primitive or a source.
+Reads either a plain value or a signal accessor.
 
-- **Type**
+- Type
 
-    ```luau
-    function read<T>(value: T | () -> T): T
-    ```
+  ```luau
+  function read<T>(value: T | (() -> T)): T
+  ```
 
 ## batch()
 
-Runs a function where any source updates made within the function do not
-trigger effects until after the function ends.
+Defers graph flushing until the callback finishes.
 
-- **Type**
+- Type
 
-    ```luau
-    function batch(fn: () -> ())
-    ```
+  ```luau
+  function batch<T...>(callback: () -> T...): T...
+  ```
 
-- **Details**
+- Example
 
-    Improves performance when an effect depends on multiple sources, and those
-    sources need to be updated.
+  ```luau
+  local a, setA = signal(0)
+  local b, setB = signal(0)
 
-- **Example**
+  root(function()
+      effect(function()
+          print(a() + b())
+      end)
 
-    ```luau
-    local a = source(0)
-    local b = source(0)
+      batch(function()
+          setA(1)
+          setB(2)
+      end)
+  end)
+  ```
 
-    effect(function()
-        print(a() + b())
-    end)
+## createContext()
 
-    -- prints "0"
+Creates a context object with a `Provider` and a default value.
 
-    batch(function()
-        a(1) -- no print
-        b(2) -- no print
-    end)
+- Type
 
-    -- prints "3"
-    ```
+  ```luau
+  function createContext<T>(defaultValue: T?): Context<T?>
 
-## context() <Badge type="info" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">STABLE</a></Badge>
+  type Context<T> = {
+      id: any,
+      defaultValue: T,
+      Provider: <TReturn>(props: {
+          value: T,
+          children: any,
+      }) -> TReturn,
+  }
+  ```
 
-Creates a new context.
+- Details
 
-- **Type**
+  - `Provider` creates a child stable scope.
+  - `children` may be a plain value or a function.
+  - If no provider exists, `useContext()` returns `defaultValue`.
 
-    ```luau
-    function context<T>(default: T): Context<T>
+## useContext()
 
-    type Context<T> =
-        () -> T -- get
-        & <U>(T, () -> U) -> U -- set
-    ```
+Reads the nearest value from a context provider.
 
-- **Details**
+- Type
 
-    Calling `context()` returns a new context function.
-    Call this function with no arguments to get the context value.
-    Call this function with a value and a function to create a new context with
-    the given value.
+  ```luau
+  function useContext<T>(context: Context<T>): T
+  ```
 
-    The new context is run under a stable scope.
+- Example
 
-- **Example**
+  ```luau
+  local Theme = createContext("light")
 
-    ```luau
-    local theme = context()
-
-    local function Button()
-        print(theme())
-    end
-
-    root(function()
-        theme("light", function()
-             Button() -- prints "light"
-
-            theme("dark", function()
-                Button() -- prints "dark"
-            end)
-        end)
-    end)
-    ```
+  root(function()
+      Theme.Provider({
+          value = "dark",
+          children = function()
+              print(useContext(Theme)) -- dark
+          end,
+      })
+  end)
+  ```

@@ -1,10 +1,11 @@
-local vide = require("../../../src/vide")
+local reactive = require("../../../src/Reactive")
+local Renderer = require("../../../src/Renderer")
 
 local Components = require("../../../src/Components")
 local Layout = require("../../../src/Layout")
 
-local mount = vide.mount
-local source = vide.source
+local mount = Renderer.mount
+local source = reactive.source
 
 local function App()
 	local cursorIndex = source(1)

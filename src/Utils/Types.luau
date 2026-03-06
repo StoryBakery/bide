@@ -1,18 +1,11 @@
 local Types = {}
 
-export type action = (
-	(Instance) -> (),
-	priority: number?
-) -> {
-	priority: number,
-	callback: (Instance) -> (),
-}
+export type attachment<T> = (T) -> unknown
 
 export type child =
 	Instance
 	| (() -> child?) -- 반응적으로 자식을 바꾸고 싶을 때
 	| { [number]: child } -- 트리 (배열처럼)
-	| action
 
 export type function props(props: type)
 	for key, prop in props:properties() do
@@ -32,22 +25,8 @@ end
 export type prop<T> = T | () -> T
 
 --[[
-	Behavior 의 setup 함수가 반환하는 정리 핸들입니다.
+	Attachment는 인스턴스에 부착되어 정리 핸들을 반환할 수 있습니다.
 ]]
-export type BehaviorHandle = {
-	Destroy: () -> (),
-	Update: (() -> ())?,
-}
-
---[[
-	InteractionState: 하나의 GuiObject에 대한 통합 상호작용 상태입니다.
-	여러 Behavior가 이벤트를 중복 연결하지 않고 이 상태를 공유합니다.
-]]
-export type InteractionState = {
-	isHovered: () -> boolean,
-	isPressed: () -> boolean,
-	pressInputObject: () -> InputObject?,
-	Destroy: () -> (),
-}
+export type AttachmentCleanup = unknown
 
 return Types

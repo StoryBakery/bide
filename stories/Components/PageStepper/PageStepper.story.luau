@@ -1,10 +1,11 @@
 local MathUtil = require("../../../roblox_packages/MathUtil")
-local vide = require("../../../src/vide")
+local reactive = require("../../../src/Reactive")
+local Renderer = require("../../../src/Renderer")
 
 local Components = require("../../../src/Components")
 
-local source = vide.source
-local mount = vide.mount
+local source = reactive.source
+local mount = Renderer.mount
 
 local function App()
 	local currentPage = source(1)

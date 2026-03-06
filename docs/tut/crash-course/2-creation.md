@@ -1,12 +1,15 @@
-# Creating UI
+---
+title: Creating UI
+---
 
-Instances are created using `create()`.
+Instances are created with `create()`.
 
-Parentheses `()` can be omitted when calling functions with string or
-table literals for brevity.
+## Basic shape
 
 ```luau
-local create = vide.create
+local bide = require("bide")
+
+local create = bide.Instance.create
 
 return create "ScreenGui" {
     create "Frame" {
@@ -15,24 +18,27 @@ return create "ScreenGui" {
         Size = UDim2.fromScale(0.4, 0.7),
 
         create "TextLabel" {
-            Text = "hi"
+            Text = "hi",
         },
 
         create "TextLabel" {
-            Text = "bye"
+            Text = "bye",
         },
 
         create "TextButton" {
             Text = "click me",
 
             Activated = function()
-                print "clicked!"
-            end
-        }
-    }
+                print("clicked!")
+            end,
+        },
+    },
 }
 ```
 
-Assign a value to a string key to set a property, and assign a value to a
-number key to set a child. Events can be connected to by assigning a function
-to a string key.
+## Property channels
+
+- String keys set properties or events.
+- Function values on non-event properties create implicit reactive bindings.
+- Number keys append children or nested child accessors.
+- `Attach` is reserved for node-level attachments.

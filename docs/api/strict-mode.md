@@ -1,30 +1,25 @@
-# Strict Mode
+---
+title: Strict Mode
+---
 
-Strict mode is library-wide and can get set by doing:
+Strict mode enables additional safety checks for the reactive runtime.
+
+## Enable strict mode
 
 ```luau
-vide.strict = true
+reactive.strict = true
 ```
 
-By default, strict mode is disabled.
+Strict mode is disabled by default.
 
-Strict mode is designed to help the development process by adding safety checks
-and identifying improper usage.
+## Current checks
 
-Currently, strict mode will:
+1. Detects yields inside stable or reactive scopes.
+2. Rejects duplicate values passed to `values()`.
+3. Rejects duplicate nested properties at the same depth.
+4. Rejects destroying an active scope.
+5. Produces more helpful effect stack traces.
 
-1. Throw an error if yields occur where they are not allowed.
-1. Check for `values()` input having duplicate values.
-1. Check for duplicate nested properties at same depth.
-1. Check for destruction of an active scope.
-1. Emit better error reporting and stack traces.
-
-Accidental yielding within reactive scopes can break Vide's reactive graph,
-which strict mode will catch.
-
-As well as additional safety checks, Vide will dedicate extra resources to
-recording and better emitting stack traces where errors occur, particularly
-when implicit effects are created for instance property updating.
-
-It is recommended to develop UI with strict mode enabled, and disable it in
-performance-sensitive production paths if needed.
+Strict mode is mainly a development tool. It spends extra work on validation and
+error reporting, so enable it while iterating and disable it if you need the
+lowest possible overhead in production paths.

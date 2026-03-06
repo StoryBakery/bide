@@ -1,27 +1,28 @@
 --[=[
 	@class CullingListFrame
 
-	버추얼 스크롤이 필요한 긴 리스트를 렌더링하는 videKit 컴포넌트입니다.
+	버추얼 스크롤이 필요한 긴 리스트를 렌더링하는 컴포넌트입니다.
 	보이지 않는 요소는 생성하지 않고, 스크롤 위치 변경 시 자연스러운 페이드/슬라이드 애니메이션을 제공합니다.
 ]=]
 
 local RunService = game:GetService("RunService")
 
 local DynamicTimer = require("../../roblox_packages/DynamicTimer")
+local Instance = require("../Instance")
 local LinearInterpolation = require("../../roblox_packages/LinearInterpolation") :: any
-local vide = require("../vide")
+local reactive = require("../Reactive")
 
+local Area = require("../Contexts/Area")
 local Button = require("./Button")
 local Frame = require("./Frame")
 local Props = require("../Utils/Props")
-local area = require("../Contexts/Area")
-local theme = require("../Contexts/Theme")
+local Theme = require("../Contexts/Theme")
 
-local create = vide.create
-local effect = vide.effect
-local signal = vide.signal
-local onCleanup = vide.onCleanup
-local read = vide.read
+local create = Instance.create
+local effect = reactive.effect
+local signal = reactive.signal
+local cleanup = reactive.cleanup
+local read = reactive.read
 
 type ElementFactory = () -> GuiObject
 type ElementLike = GuiObject | ElementFactory
@@ -85,45 +86,27 @@ type ElementEntry = ElementLike | {
 	
 	.ReversesAlignment boolean? -- true 일 경우 정렬 방향과 스크롤 방향을 반대로 적용합니다.
 ]=]
-export type CullingListFrameProps = {
-	ScrollingEnabled: boolean?,
-	ScrollingDirection: "X" | "Y"?,
-	CursorIndex: number?,
+local OWN_PROPS_SCHEMA = {
+	ScrollingEnabled = Props.optional<<boolean>>(),
+	ScrollingDirection = Props.optional<<"X" | "Y">>(),
+	CursorIndex = Props.optional<<number>>(),
+	ScrollBarVisible = Props.optional<<boolean>>(),
+	ScrollBarThickness = Props.optional<<number>>(),
+	ScrollBarColor = Props.optional<<Color3>>(),
+	ScrollDeltaScale = Props.optional<<number>>(),
+	FadeDuration = Props.optional<<number>>(),
+	CullingFadeColor = Props.optional<<Color3>>(),
+	CullingFadeTransparency = Props.optional<<number>>(),
+	Elements = Props.required<<{ ElementEntry }>>(),
+	OnCursorChange = Props.optional<<((delta: number) -> ())>>(),
+	SortOrder = Props.optional<<"Name" | "Order" | "Index">>(),
+	ReversesAlignment = Props.optional<<boolean>>(),
+	ref = Props.optional<<((ScrollingFrame?) -> ())>>(),
+}
 
-	ScrollBarVisible: boolean?,
-	ScrollBarThickness: number?,
-	ScrollBarColor: Color3?,
-	ScrollDeltaScale: number?,
+export type CullingListFrameOwnProps = typeof(OWN_PROPS_SCHEMA)
 
-	FadeDuration: number?,
-
-	CullingFadeColor: Color3?,
-	CullingFadeTransparency: number?,
-	Elements: { ElementEntry },
-
-	OnCursorChange: ((delta: number) -> ())?,
-
-	SortOrder: "Name" | "Order" | "Index"?,
-	ReversesAlignment: boolean?,
-} & Frame.FrameProps
-
-local OWNED_KEY_SET = Props.keySet({
-	"ScrollingEnabled",
-	"ScrollingDirection",
-	"CursorIndex",
-	"ScrollBarVisible",
-	"ScrollBarThickness",
-	"ScrollBarColor",
-	"ScrollDeltaScale",
-	"FadeDuration",
-	"CullingFadeColor",
-	"CullingFadeTransparency",
-	"Elements",
-	"OnCursorChange",
-	"SortOrder",
-	"ReversesAlignment",
-	"ref",
-})
+export type CullingListFrameProps = CullingListFrameOwnProps & Frame.FrameProps
 
 type PropElementInfo = any
 type IndexChangeInfo = any
@@ -247,18 +230,12 @@ local function CullingListFrame(
 	props: CullingListFrameProps,
 	forwardedRef: ((ScrollingFrame?) -> ())?
 )
-	local localProps, restProps = Props.splitProps(props :: any, OWNED_KEY_SET)
-	local frameProps = Props.composeProps({}, restProps :: any, props :: any)
+	local ownProps, frameProps, propChildren = Props.splitProps(props :: any, OWN_PROPS_SCHEMA)
+	local area = reactive.useContext(Area) :: Area.AreaValue
+	local themeContext = reactive.useContext(Theme)
+	local getTheme = themeContext.Get
 
-	local propChildren: { any } = {}
-	for key, child in frameProps do
-		if type(key) == "number" then
-			propChildren[#propChildren + 1] = child
-			frameProps[key] = nil
-		end
-	end
-
-	local userRef = localProps.ref
+	local userRef = read(ownProps.ref)
 	frameProps.Class = frameProps.Class or "ScrollingFrame"
 	frameProps.CanvasSize = UDim2.fromOffset(0, 0)
 	frameProps.ScrollBarThickness = 0
@@ -278,7 +255,7 @@ local function CullingListFrame(
 	end
 
 	local function getScrollingDirection(): "X" | "Y"
-		local direction = read(localProps.ScrollingDirection)
+		local direction = read(ownProps.ScrollingDirection)
 		if direction == "X" or direction == "Y" then
 			return direction
 		end
@@ -286,51 +263,51 @@ local function CullingListFrame(
 	end
 
 	local function getReversesAlignment(): boolean
-		return (read(localProps.ReversesAlignment) :: boolean?) or false
+		return (read(ownProps.ReversesAlignment) :: boolean?) or false
 	end
 
 	local function getScrollingEnabled()
-		if localProps.ScrollingEnabled == nil then
+		if ownProps.ScrollingEnabled == nil then
 			return true
 		end
 
-		return read(localProps.ScrollingEnabled)
+		return read(ownProps.ScrollingEnabled)
 	end
 
 	local function getScrollDeltaScale()
-		return (read(localProps.ScrollDeltaScale) :: number?) or 1
+		return (read(ownProps.ScrollDeltaScale) :: number?) or 1
 	end
 
 	local function getScrollBarThickness()
-		return (read(localProps.ScrollBarThickness) :: number?) or 12
+		return (read(ownProps.ScrollBarThickness) :: number?) or 12
 	end
 
 	local function getScrollBarVisible()
-		if localProps.ScrollBarVisible == nil then
+		if ownProps.ScrollBarVisible == nil then
 			return true
 		end
 
-		return read(localProps.ScrollBarVisible)
+		return read(ownProps.ScrollBarVisible)
 	end
 
 	local function getFadeDuration()
-		return (read(localProps.FadeDuration) :: number?) or 0.5
+		return (read(ownProps.FadeDuration) :: number?) or 0.5
 	end
 
-	local getScrollBarColor = resolveSignalValue(localProps.ScrollBarColor, function()
-		return theme().ScrollBar
+	local getScrollBarColor = resolveSignalValue(ownProps.ScrollBarColor, function()
+		return getTheme().ScrollBar
 	end)
-	local getCullingFadeColor = resolveSignalValue(localProps.CullingFadeColor, function()
-		return theme().CullingFade
+	local getCullingFadeColor = resolveSignalValue(ownProps.CullingFadeColor, function()
+		return getTheme().CullingFade
 	end)
 	local getCullingFadeTransparency = resolveSignalValue(
-		localProps.CullingFadeTransparency,
+		ownProps.CullingFadeTransparency,
 		function()
-			return theme().CullingFadeTransparency
+			return getTheme().CullingFadeTransparency
 		end
 	)
 
-	local userInputManager = area().UserInputManager
+	local userInputManager = area.UserInputManager
 
 	local getPropElementInfosByIndex, setPropElementInfosByIndex =
 		createState({} :: { PropElementInfo })
@@ -338,7 +315,7 @@ local function CullingListFrame(
 	local getElementCount, setElementCount = createState(0)
 
 	local getCursorIndex, setCursorIndex =
-		createState(math.max((read(localProps.CursorIndex) :: number?) or 1, 1))
+		createState(math.max((read(ownProps.CursorIndex) :: number?) or 1, 1))
 	local getRenderMaxIndex, setRenderMaxIndex = createState(getCursorIndex())
 
 	local getProgressesByIndex, setProgressesByIndex = createState({} :: { [number]: number })
@@ -395,13 +372,13 @@ local function CullingListFrame(
 	end
 
 	effect(function()
-		setCursorIndex(math.max((read(localProps.CursorIndex) :: number?) or 1, 1))
+		setCursorIndex(math.max((read(ownProps.CursorIndex) :: number?) or 1, 1))
 	end)
 
 	effect(function()
-		local elements = (read(localProps.Elements) :: { [any]: any }?)
+		local elements = (read(ownProps.Elements) :: { [any]: any }?)
 			or error("Missing props.Elements")
-		local sortOrder = (read(localProps.SortOrder) :: string?) or "Index"
+		local sortOrder = (read(ownProps.SortOrder) :: string?) or "Index"
 		local compareElementInfo = getCompareElementInfo(sortOrder)
 
 		local newPropElementInfosByIndex: { any } = {}
@@ -533,13 +510,13 @@ local function CullingListFrame(
 
 			setCursorIndex(newCursorIndex)
 
-			local onCursorChange = localProps.OnCursorChange :: ((number) -> ())?
+			local onCursorChange = read(ownProps.OnCursorChange) :: ((number) -> ())?
 			if onCursorChange then
 				onCursorChange(newCursorIndex)
 			end
 		end)
 
-		onCleanup(function()
+		cleanup(function()
 			scrollConn:Disconnect()
 		end)
 	end)
@@ -556,7 +533,7 @@ local function CullingListFrame(
 			setFrameSize(getVector2Axis(scrollingFrame.AbsoluteSize, getScrollingDirection()))
 		end)
 
-		onCleanup(function()
+		cleanup(function()
 			conn:Disconnect()
 		end)
 	end)
@@ -589,7 +566,7 @@ local function CullingListFrame(
 		)
 		setCursorIndex(newCursorIndex)
 
-		local onCursorChange = localProps.OnCursorChange :: ((number) -> ())?
+		local onCursorChange = read(ownProps.OnCursorChange) :: ((number) -> ())?
 		if onCursorChange then
 			onCursorChange(newCursorIndex)
 		end
@@ -647,7 +624,7 @@ local function CullingListFrame(
 			end)
 		end)
 
-		onCleanup(function()
+		cleanup(function()
 			removeScrollBarSmoother(scrollBarSmootherToken)
 		end)
 	end)
@@ -907,7 +884,7 @@ local function CullingListFrame(
 		lastIndexesByKeyRef.current = elementIndexesByKey
 	end)
 
-	onCleanup(function()
+	cleanup(function()
 		removeScrollBarSmoother(scrollBarDragToken)
 		removeScrollBarSmoother(scrollBarSmootherToken)
 
@@ -1108,7 +1085,7 @@ local function CullingListFrame(
 
 	local children: { any } = {}
 
-	local scrollBar = vide.show(getScrollBarVisible, function()
+	local scrollBar = reactive.show(getScrollBarVisible, function()
 		local function getScrollBarPositionUDim2()
 			local scrollBarPosition = getScrollBarPosition()
 			if not getReversesAlignment() then
@@ -1201,14 +1178,14 @@ local function CullingListFrame(
 		return getVisibleCanvasGroups()
 	end
 
-	children[#children + 1] = create("Frame")(listProps :: any)
+	table.insert(children, create("Frame")(listProps :: any))
 
-	for _, child in propChildren do
-		children[#children + 1] = child
+	if #propChildren > 0 then
+		table.move(propChildren, 1, #propChildren, #children + 1, children)
 	end
 
-	for _, child in children do
-		frameProps[#frameProps + 1] = child
+	if #children > 0 then
+		table.move(children, 1, #children, #frameProps + 1, frameProps)
 	end
 
 	return Frame(frameProps :: any)

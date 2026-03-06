@@ -2,13 +2,9 @@
     @class UIGradientWrapper
 ]=]
 
-local vide = require("../vide")
+local Instance = require("../Instance")
 
-local Props = require("../Utils/Props")
-
-local create = vide.create
-
-local EMPTY_KEY_SET = {}
+local create = Instance.create
 
 type Prop<T> = T | (() -> T)
 
@@ -21,8 +17,7 @@ export type GradientProps = {
 }
 
 local function Gradient(props: GradientProps)
-	local _, restProps = Props.splitProps(props :: any, EMPTY_KEY_SET)
-	return create "UIGradient"(Props.composeProps({}, restProps :: any, props :: any))
+	return create "UIGradient"(props :: any)
 end
 
 return Gradient

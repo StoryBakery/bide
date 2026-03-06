@@ -36,7 +36,6 @@ export default withMermaid({
                         { text: "Reactivity: Utility", link: "/api/reactivity-utility" },
                         { text: "Reactivity: Dynamic Scoping", link: "/api/reactivity-dynamic" },
                         { text: "Element Creation", link: "/api/creation" },
-                        { text: "Animation", link: "/api/animation" },
                         { text: "Strict Mode", link: "/api/strict-mode" },
                     ]
                 }

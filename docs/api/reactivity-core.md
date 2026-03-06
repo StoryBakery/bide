@@ -1,157 +1,134 @@
-# Reactivity: Core
+---
+title: Reactivity Core
+---
+
+Core reactive primitives: scopes, signals, effects, and memoized accessors.
 
 ## Scopes
 
-Vide code can run in one of two scopes: <Badge type="info" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">STABLE</a></Badge> or <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>.
+Reactive code runs in one of two scopes.
 
-- Reactive scopes rerun if a source read within updates.
 - Stable scopes never rerun.
-- Reactive scopes cannot be created directly within another reactive scope.
-- When a scope is destroyed, all scopes created within are also destroyed.
+- Reactive scopes rerun when tracked signals update.
+- Child scopes are owned by the scope that created them.
+- Destroying a scope also destroys all scopes created within it.
 
-Different functions in Vide's API will run code in different scopes.
+Yielding is not allowed inside stable or reactive scopes. `reactive.strict = true`
+adds stricter checks and better stack traces for these failures.
 
-:::warning
-Yielding is not allowed in any stable or reactive scope. Strict mode will check
-for this.
-:::
-
-## root() <Badge type="info" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">STABLE</a></Badge>
+## root()
 
 Runs a function in a new stable scope.
 
-- **Type**
+- Type
 
-    ```luau
-    function root<T...>(fn: (Destructor) -> T...): T...
+  ```luau
+  function root<T...>(fn: (destroy: () -> ()) -> T...): T...
+  ```
 
-    type Destructor = () -> ()
-    ```
+- Details
 
-- **Details**
+  - `root()` is the entry point for creating a top-level stable scope.
+  - The callback receives `destroy()`, which disposes that scope manually.
+  - `root()` returns the callback return values.
 
-    Returns the callback return values.
+## signal()
 
-    If you need to destroy the scope manually, return `Destructor` from the callback.
+Creates a signal accessor and setter pair.
 
-## source()
+- Type
 
-Creates a new source.
+  ```luau
+  function signal<T>(
+      initialValue: T,
+      options: {
+          equals: boolean | ((T, T) -> boolean)?,
+      }?
+  ): (() -> T, (T | ((T) -> T)) -> T)
+  ```
 
-- **Type**
+- Details
 
-    ```luau
-    function source<T>(value: T): Source<T>
+  - The accessor reads the current value and participates in dependency tracking.
+  - The setter updates the value and notifies dependents when the equality check fails.
+  - Table mutation must still produce a new table reference if you want updates to
+    propagate.
 
-    type Source<T> =
-        () -> T -- get
-        & (T) -> () -- set
-    ```
+- Example
 
-- **Details**
+  ```luau
+  local count, setCount = signal(0)
 
-    Call the returned source with no argument to read its value.
-    Call the returned source with an argument to set its value.
+  print(count()) -- 0
+  setCount(count() + 1)
+  print(count()) -- 1
+  ```
 
-- **Example**
+## effect()
 
-    ```luau
-    local count = source(0)
-    print(count())-- 0
-    count(count() + 1)
-    print(count()) -- 1
-    ```
+Creates a reactive scope that reruns when tracked signals change.
 
-## effect() <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>
+- Type
 
-Runs a function in a new reactive scope.
+  ```luau
+  function effect(callback: () -> ())
+  ```
 
-- **Type**
+- Details
 
-    ```luau
-    function effect(fn: () -> ())
-    ```
+  - `effect()` must be called from an existing scope.
+  - Any signal accessor read during the callback becomes a dependency.
+  - Use `untrack()` for reads that should not become dependencies.
 
-- **Details**
+- Example
 
-    The function is ran once immediately.
+  ```luau
+  local count, setCount = signal(0)
 
-- **Example**
+  root(function()
+      effect(function()
+          print(`count: {count()}`)
+      end)
 
-    ```luau
-    local count = source(1)
+      setCount(1)
+  end)
+  ```
 
-    effect(function()
-        print(count())
-    end)
+## memo()
 
-    -- prints 1
+Caches a derived value inside a reactive scope.
 
-    count(2)
+- Type
 
-    -- prints 2
-    ```
+  ```luau
+  function memo<T>(
+      callback: (previous: T?) -> T,
+      initialValue: T?,
+      options: {
+          equals: boolean | ((T, T) -> boolean)?,
+      }?
+  ): () -> T
+  ```
 
-## derive() <Badge type="tip" text="STABLE"><a href="/vide/api/reactivity-core#Scopes">REACTIVE</a></Badge>
+- Details
 
-Runs a function in a new reactive scope to compute a value for new source.
+  - `memo()` must be created from an existing scope.
+  - The callback receives the previous derived value.
+  - Repeated reads return the cached result until dependencies change.
+  - `options.equals` controls whether downstream updates should propagate.
 
-- **Type**
+- Example
 
-    ```luau
-    function derive<T>(fn: () -> T): () -> T
-    ```
+  ```luau
+  local count, setCount = signal(0)
 
-- **Details**
+  root(function()
+      local label = memo(function()
+          return `count: {count()}`
+      end)
 
-    Anytime the reactive scope reruns, the output source value is set to what is
-    returned.
-
-    The function is ran once immediately.
-
-- **Example**
-
-    ```luau
-    local count = source(0)
-    local text = derive(function() return `count: {count()}` end)
-
-    print(text()) -- "count: 0"
-
-    count(1)
-
-    print(text()) -- "count: 1"
-    ```
-
-    A `derive()` should be used instead of a pure function when you expect it to
-    be read multiple times between updates, because `derive()` will cache the
-    result to prevent recomputing it on every read.
-
-    ::: code-group
-
-    ```luau [Pure Function]
-    local count = source(0)
-
-    local text = function()
-        print "ran"
-        return `count: {count()}`
-    end
-
-    count(1)
-    print(text()) -- prints "ran" followed by "count: 1"
-    print(text()) -- prints "ran" followed by "count: 1"
-    ```
-
-    ```luau [Derived Source]
-    local count = source(0)
-
-    local text = derive(function() -- [!code highlight]
-        print "ran"
-        return `count: {count()}`
-    end) -- [!code highlight]
-
-    count(1) -- prints "ran"
-    print(text()) -- prints "count: 1"
-    print(text()) -- prints "count: 1"
-    ```
-
-    :::
+      print(label()) -- count: 0
+      setCount(1)
+      print(label()) -- count: 1
+  end)
+  ```

@@ -4,57 +4,62 @@
 	테마 기본값이 적용된 TextLabel 래퍼입니다.
 ]=]
 
-local vide = require("../vide")
+local TableUtil = require("../../roblox_packages/TableUtil")
+local reactive = require("../Reactive")
 
-local Element = require("../Core/Element")
+local Frame = require("./Frame")
 local Props = require("../Utils/Props")
-local theme = require("../Contexts/Theme")
+local Theme = require("../Contexts/Theme")
 
-local read = vide.read
+local read = reactive.read
 
 type Prop<T> = T | (() -> T)
 
-export type TextLabelProps = {
-	Text: Prop<string>?,
-	TextColor3: Prop<Color3>?,
-	TextSize: Prop<number>?,
+local OWN_PROPS_SCHEMA = {
+	Text = Props.optional<<string>>(),
+	TextColor3 = Props.optional<<Color3>>(),
+	TextSize = Props.optional<<number>>(),
+	FontFace = Props.optional<<Font>>(),
+}
+
+export type TextLabelOwnProps = typeof(OWN_PROPS_SCHEMA)
+
+type TextLabelBaseProps = {
 	TextScaled: boolean?,
 	TextXAlignment: Prop<Enum.TextXAlignment>?,
 	TextYAlignment: Prop<Enum.TextYAlignment>?,
 	TextTransparency: Prop<number>?,
-	FontFace: Font?,
-}
+} & Frame.FrameProps
 
-local OWNED_KEY_SET = Props.keySet({
-	"Text",
-	"TextColor3",
-	"TextSize",
-	"FontFace",
-})
+export type TextLabelProps = TextLabelOwnProps & TextLabelBaseProps
 
 local function TextLabel(props: TextLabelProps): GuiBase2d
-	local owned, forward, children = Props.extract(props :: any, OWNED_KEY_SET)
+	local ownProps, forwardProps, children = Props.splitProps(props :: any, OWN_PROPS_SCHEMA)
+	local themeContext = reactive.useContext(Theme)
+	local getTheme = themeContext.Get
 
 	local base = {
 		Class = "TextLabel",
 		BackgroundTransparency = 1,
 		Text = function()
-			return read(owned.Text) or ""
+			return read(ownProps.Text) or ""
 		end,
 		TextColor3 = function()
-			return read(owned.TextColor3) or theme().Text
+			return read(ownProps.TextColor3) or getTheme().Text
 		end,
 		TextSize = function()
-			return read(owned.TextSize) or 14
+			return read(ownProps.TextSize) or 14
 		end,
-		FontFace = owned.FontFace,
+		FontFace = ownProps.FontFace,
 		StrokeEnabled = false,
 	}
 
-	local elementProps = Props.merge(base, forward)
-	Props.appendChildren(elementProps, children)
+	local elementProps = TableUtil.merge(base, forwardProps)
+	if #children > 0 then
+		table.move(children, 1, #children, #elementProps + 1, elementProps)
+	end
 
-	return Element(elementProps :: any)
+	return Frame(elementProps :: any)
 end
 
 return TextLabel

@@ -1,14 +1,16 @@
-local vide = require("../../../../../src/vide")
+local reactive = require("../../../../../src/Reactive")
+local Renderer = require("../../../../../src/Renderer")
 
+local Attachments = require("../../../../../src/Attachments")
 local Components = require("../../../../../src/Components")
-local DragAxis = require("../../../../../src/Behaviors/DragAxis")
 local Layout = require("../../../../../src/Layout")
-local area = require("../../../../../src/Contexts/Area")
+local Area = require("../../../../../src/Contexts/Area")
 
-local mount = vide.mount
-local source = vide.source
+local mount = Renderer.mount
+local source = reactive.source
 
 local function App()
+	local area = reactive.useContext(Area) :: Area.AreaValue
 	local value = source(0.5)
 
 	local function onDragMove(delta)
@@ -42,12 +44,13 @@ local function App()
 			Text = function()
 				return string.format("Drag Me (%.3f)", value())
 			end,
-
-			DragAxis({
-				UserInputManager = area().UserInputManager,
-				SlideDirection = "X",
-				OnDragMove = onDragMove,
-			}),
+			Attach = {
+				Attachments.DragAxis({
+					UserInputManager = area.UserInputManager,
+					SlideDirection = "X",
+					OnDragMove = onDragMove,
+				}),
+			},
 		}),
 
 		Components.Frame({

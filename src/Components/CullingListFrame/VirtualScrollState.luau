@@ -5,10 +5,10 @@
 	CullingListFrame 에서 추출한 상태 관리 유틸리티입니다.
 ]=]
 
-local vide = require("../../vide")
+local reactive = require("../../Reactive")
 
-local signal = vide.signal
-local read = vide.read
+local signal = reactive.signal
+local read = reactive.read
 
 local function createState<T>(initialValue: T)
 	return signal(initialValue)
